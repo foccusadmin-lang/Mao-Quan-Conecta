@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA } from './seed';
-import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl } from './utils';
+import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
 const COLECOES = ['filiais', 'professores', 'alunos', 'pagamentos', 'presencas', 'materiais', 'eventos', 'comunicados', 'notificacoes'];
 const UNICOS = ['config', 'termos', 'institucional', 'modelos', 'diretoria', 'precos'];
@@ -22,6 +22,16 @@ let auth = { status: 'carregando' }; // carregando | anon | novo | pronto | recu
 let sessaoSupabase = null;
 const recentes = new Map(); // gravações locais recentes (ignora o eco do tempo real)
 
+/** Documentos e telefones sempre no formato com máscara (inclusive cadastros antigos) */
+function formatarPessoa(p) {
+  if (!p) return p;
+  if (p.rg) p.rg = maskRG(p.rg);
+  if (p.cpf) p.cpf = maskCPF(p.cpf);
+  if (p.telefone) p.telefone = maskTelefone(p.telefone);
+  if (p.saude?.emergenciaTel) p.saude.emergenciaTel = maskTelefone(p.saude.emergenciaTel);
+  return p;
+}
+
 /** Completa o que vier do banco com os padrões do app */
 function normalizar(data) {
   const base = seed();
@@ -30,6 +40,9 @@ function normalizar(data) {
   if (!data.config.faixas?.[0]?.nivel) data.config.faixas = FAIXAS_PADRAO;
   if (!data.modelos?.aluno?.oficial) data.modelos = base.modelos;
   data.notificacoes.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  data.alunos.forEach(formatarPessoa);
+  data.professores.forEach(formatarPessoa);
+  data.filiais.forEach((f) => f.telefone && (f.telefone = maskTelefone(f.telefone)));
   return data;
 }
 
@@ -172,6 +185,7 @@ function aplicarRemoto(tabela, evento, novo, velho) {
   const aplicar = (lista = []) => {
     if (evento === 'DELETE') return lista.filter((r) => r.id !== id);
     const row = { ...novo.data, id };
+    if (tabela === 'alunos' || tabela === 'professores') formatarPessoa(row);
     const i = lista.findIndex((r) => r.id === id);
     if (i >= 0) return lista.map((r) => (r.id === id ? row : r));
     return tabela === 'notificacoes' ? [row, ...lista] : [...lista, row];

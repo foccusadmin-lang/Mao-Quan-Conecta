@@ -23,8 +23,8 @@ export default function Perfil({ user }) {
             <div className="form-grid">
               <Field label="WhatsApp"><Inp obj={f} set={setF} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
               <Field label="Nascimento"><Inp obj={f} set={setF} k="nascimento" type="date" /></Field>
-              <Field label="RG"><input value={f.rg} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
-              <Field label="CPF"><input value={f.cpf} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
+              <Field label="RG"><input value={maskRG(f.rg || '')} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
+              <Field label="CPF"><input value={maskCPF(f.cpf || '')} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
               <Field label="Responsável"><Inp obj={f} set={setF} k="responsavel" /></Field>
             </div>
             <div className="xs muted">Termos assinados em {fmtDate(user.termos?.data)} como “{user.termos?.assinatura}”.</div>

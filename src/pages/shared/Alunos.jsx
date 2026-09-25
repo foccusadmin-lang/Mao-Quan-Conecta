@@ -196,8 +196,8 @@ function AlunoModal({ id, user, onClose, ask }) {
             <Field label="E-mail (Google)"><Inp obj={f} set={setF} k="email" type="email" disabled={!isAdmin} /></Field>
             <Field label="Telefone"><Inp obj={f} set={setF} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
             <Field label="Nascimento"><Inp obj={f} set={setF} k="nascimento" type="date" /></Field>
-            <Field label="RG"><input value={f.rg || ''} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
-            <Field label="CPF"><input value={f.cpf || ''} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
+            <Field label="RG"><input value={maskRG(f.rg || '')} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
+            <Field label="CPF"><input value={maskCPF(f.cpf || '')} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
             <Field label="Responsável"><Inp obj={f} set={setF} k="responsavel" /></Field>
             <Field label="Matrícula"><Inp obj={f} set={setF} k="matricula" disabled={!isAdmin} /></Field>
             {isAdmin && (
@@ -402,9 +402,9 @@ function FichaA4({ a, fr }) {
           <div><b>Nome:</b> {a.nome}</div>
           <div><b>Matrícula:</b> {a.matricula}</div>
           <div><b>Nascimento:</b> {fmtDate(a.nascimento)}</div>
-          <div><b>RG:</b> {a.rg || '—'}</div>
-          <div><b>CPF:</b> {a.cpf || '—'}</div>
-          <div><b>Telefone:</b> {a.telefone || '—'}</div>
+          <div><b>RG:</b> {a.rg ? maskRG(a.rg) : '—'}</div>
+          <div><b>CPF:</b> {a.cpf ? maskCPF(a.cpf) : '—'}</div>
+          <div><b>Telefone:</b> {a.telefone ? maskTelefone(a.telefone) : '—'}</div>
           <div><b>E-mail:</b> {a.email}</div>
           <div><b>Responsável:</b> {a.responsavel || '—'}</div>
           <div><b>Filial:</b> {filialNome(db, a.filialId)}</div>
@@ -420,7 +420,7 @@ function FichaA4({ a, fr }) {
           <div><b>Lesões:</b> {s.lesoes || '—'}</div>
           <div style={{ gridColumn: '1/-1' }}><b>Restrições:</b> {s.restricoes || '—'}</div>
           <div><b>Emergência:</b> {s.emergenciaNome || '—'}</div>
-          <div><b>Tel. emergência:</b> {s.emergenciaTel || '—'}</div>
+          <div><b>Tel. emergência:</b> {s.emergenciaTel ? maskTelefone(s.emergenciaTel) : '—'}</div>
         </div>
       </div>
       <div className="sec">

@@ -101,8 +101,8 @@ export default function Professores() {
               <Field label="E-mail de login (Google)"><Inp obj={edit} set={setEdit} k="email" type="email" /></Field>
               <Field label="Telefone"><Inp obj={edit} set={setEdit} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
               <Field label="Nascimento"><Inp obj={edit} set={setEdit} k="nascimento" type="date" /></Field>
-              <Field label="RG"><input value={edit.rg || ''} onChange={(e) => setEdit({ ...edit, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
-              <Field label="CPF"><input value={edit.cpf || ''} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
+              <Field label="RG"><input value={maskRG(edit.rg || '')} onChange={(e) => setEdit({ ...edit, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
+              <Field label="CPF"><input value={maskCPF(edit.cpf || '')} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
               <Field label="Título">
                 <select value={edit.titulo} onChange={(e) => setEdit({ ...edit, titulo: e.target.value })}>
                   {TITULOS.map((t) => <option key={t}>{t}</option>)}

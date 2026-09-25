@@ -42,8 +42,8 @@ export default function PrimeiroAcesso() {
           <Field label="Nome completo"><input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} /></Field>
           <Field label="WhatsApp"><input type="tel" value={f.telefone} onChange={(e) => setF({ ...f, telefone: maskTelefone(e.target.value) })} placeholder="(11) 90000-0000" /></Field>
           <Field label="Data de nascimento"><input type="date" value={f.nascimento} onChange={(e) => setF({ ...f, nascimento: e.target.value })} /></Field>
-          <Field label="RG"><input value={f.rg} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
-          <Field label="CPF"><input value={f.cpf} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
+          <Field label="RG"><input value={maskRG(f.rg || '')} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
+          <Field label="CPF"><input value={maskCPF(f.cpf || '')} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
           <Field label="Academia / Filial">
             <select value={f.filialId} onChange={(e) => setF({ ...f, filialId: e.target.value })}>
               <option value="">Selecione…</option>

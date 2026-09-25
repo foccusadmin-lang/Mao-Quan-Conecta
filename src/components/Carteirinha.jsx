@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { toPng, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { faixaNome, faixaNivel, filialNome } from '../lib/db';
-import { fmtDate, b64e, APP_URL } from '../lib/utils';
+import { fmtDate, b64e, APP_URL, maskRG, maskCPF } from '../lib/utils';
 import { toast } from './ui';
 export { CAMPOS_PADRAO, MODELOS_PADRAO } from '../lib/seed';
 import { useQR } from './shared';
@@ -31,8 +31,8 @@ export function dadosCarteirinha(db, pessoa, tipo) {
   const payload = b64e({ id: pessoa.id, n: pessoa.nome, t: tipo, f: faixaNome(db, pessoa.faixaIdx), fl: filialNome(db, pessoa.filialId), m: pessoa.matricula || pessoa.id.slice(-6).toUpperCase(), v: validade, k: pessoa.qrToken });
   return {
     nome: pessoa.nome,
-    rg: pessoa.rg || '—',
-    cpf: pessoa.cpf || '—',
+    rg: pessoa.rg ? maskRG(pessoa.rg) : '—',
+    cpf: pessoa.cpf ? maskCPF(pessoa.cpf) : '—',
     nascimento: pessoa.nascimento ? fmtDate(pessoa.nascimento) : '—',
     graduacao: graduacaoTexto(db, pessoa, tipo),
     escola: filialNome(db, pessoa.filialId),
