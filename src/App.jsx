@@ -1,0 +1,136 @@
+﻿import { useEffect } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { useDB, useSession, rotinaFinanceira, temRecurso } from './lib/db';
+import Layout from './components/Layout';
+import { Toaster } from './components/ui';
+import Login from './pages/Login';
+import Validar from './pages/Validar';
+import Patrocinador from './pages/Patrocinador';
+
+import AdminDashboard from './pages/admin/Dashboard';
+import Filiais from './pages/admin/Filiais';
+import Professores from './pages/admin/Professores';
+import Carteirinhas from './pages/admin/Carteirinhas';
+import Diretoria from './pages/admin/Diretoria';
+import InstitucionalAdmin from './pages/admin/InstitucionalAdmin';
+import Termos from './pages/admin/Termos';
+import Config from './pages/admin/Config';
+
+import Alunos from './pages/shared/Alunos';
+import Graduacao from './pages/shared/Graduacao';
+import Financeiro from './pages/shared/Financeiro';
+import Eventos from './pages/shared/Eventos';
+import Comunicados from './pages/shared/Comunicados';
+import Materiais from './pages/shared/Materiais';
+
+import ProfDashboard from './pages/professor/Dashboard';
+import Presenca from './pages/professor/Presenca';
+import Estudo from './pages/professor/Estudo';
+import Filiacao from './pages/professor/Filiacao';
+import ProfCarteira from './pages/professor/Carteira';
+
+import AlunoGate from './pages/aluno/Gate';
+import AlunoHome from './pages/aluno/Home';
+import AlunoCarteira from './pages/aluno/Carteira';
+import Conteudo from './pages/aluno/Conteudo';
+import AlunoPresenca from './pages/aluno/Presenca';
+import Atleta from './pages/aluno/Atleta';
+import Pagamentos from './pages/aluno/Pagamentos';
+import Perfil from './pages/aluno/Perfil';
+import { Institucional, DiretoriaList } from './components/shared';
+import { PageHead } from './components/ui';
+
+function useCurrentUser() {
+  const db = useDB();
+  const s = useSession();
+  if (!s) return null;
+  if (s.role === 'admin') return { id: 'admin', role: 'admin', nome: 'Central Mao', foto: null };
+  if (s.role === 'professor') {
+    const p = db.professores.find((x) => x.id === s.id && x.ativo);
+    return p ? { ...p, role: 'professor' } : null;
+  }
+  if (s.role === 'aluno') {
+    const a = db.alunos.find((x) => x.id === s.id);
+    if (!a) return null;
+    // Aluno promovido a Professor: a mesma conta Google passa a abrir o Painel do Laoshi
+    const p = db.professores.find((x) => x.ativo && x.email.toLowerCase() === a.email.toLowerCase());
+    return p ? { ...p, role: 'professor' } : { ...a, role: 'aluno' };
+  }
+  return null;
+}
+
+export default function App() {
+  const user = useCurrentUser();
+  useEffect(() => {
+    rotinaFinanceira();
+    const t = setInterval(rotinaFinanceira, 60 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const home = user ? '/' + user.role : '/login';
+
+  return (
+    <>
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to={home} replace /> : <Login />} />
+        <Route path="/validar/:payload" element={<Validar />} />
+        <Route path="/patrocinador/:token?" element={<Patrocinador />} />
+
+        {user?.role === 'admin' && (
+          <Route path="/admin" element={<Layout user={user} />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="filiais" element={<Filiais />} />
+            <Route path="professores" element={<Professores />} />
+            <Route path="alunos" element={<Alunos user={user} />} />
+            <Route path="graduacao" element={<Graduacao user={user} />} />
+            <Route path="financeiro" element={<Financeiro user={user} />} />
+            <Route path="carteirinhas" element={<Carteirinhas />} />
+            <Route path="eventos" element={<Eventos user={user} />} />
+            <Route path="comunicados" element={<Comunicados user={user} />} />
+            <Route path="materiais" element={<Materiais user={user} />} />
+            <Route path="diretoria" element={<Diretoria />} />
+            <Route path="institucional" element={<InstitucionalAdmin />} />
+            <Route path="termos" element={<Termos />} />
+            <Route path="config" element={<Config />} />
+          </Route>
+        )}
+
+        {user?.role === 'professor' && (
+          <Route path="/professor" element={<Layout user={user} />}>
+            <Route index element={<ProfDashboard user={user} />} />
+            {temRecurso(user, 'alunos') && <Route path="alunos" element={<Alunos user={user} />} />}
+            {temRecurso(user, 'presenca') && <Route path="presenca" element={<Presenca user={user} />} />}
+            {temRecurso(user, 'graduacao') && <Route path="graduacao" element={<Graduacao user={user} />} />}
+            {temRecurso(user, 'financeiro') && <Route path="financeiro" element={<Financeiro user={user} />} />}
+            {temRecurso(user, 'materiais') && <Route path="materiais" element={<Materiais user={user} />} />}
+            {temRecurso(user, 'estudo') && <Route path="estudo" element={<Estudo user={user} />} />}
+            {temRecurso(user, 'sede') && <Route path="sede" element={<Comunicados user={user} />} />}
+            {temRecurso(user, 'eventos') && <Route path="eventos" element={<Eventos user={user} />} />}
+            {temRecurso(user, 'carteira') && <Route path="carteira" element={<ProfCarteira user={user} />} />}
+            {temRecurso(user, 'filiacao') && <Route path="filiacao" element={<Filiacao user={user} />} />}
+          </Route>
+        )}
+
+        {user?.role === 'aluno' && (
+          <Route path="/aluno" element={<AlunoGate user={user} />}>
+            <Route element={<Layout user={user} />}>
+              <Route index element={<AlunoHome user={user} />} />
+              <Route path="carteira" element={<AlunoCarteira user={user} />} />
+              <Route path="conteudo" element={<Conteudo user={user} />} />
+              <Route path="presenca" element={<AlunoPresenca user={user} />} />
+              <Route path="eventos" element={<Eventos user={user} />} />
+              <Route path="atleta" element={<Atleta user={user} />} />
+              <Route path="institucional" element={<><PageHead title="Institucional" sub="Linhagem, história e o código de ética Wu De" /><Institucional /></>} />
+              <Route path="diretoria" element={<><PageHead title="Diretoria 2025" sub="Diretores em atuação na vigência atual" /><DiretoriaList /></>} />
+              <Route path="pagamentos" element={<Pagamentos user={user} />} />
+              <Route path="perfil" element={<Perfil user={user} />} />
+            </Route>
+          </Route>
+        )}
+
+        <Route path="*" element={<Navigate to={home} replace />} />
+      </Routes>
+      <Toaster />
+    </>
+  );
+}
