@@ -1,119 +1,317 @@
-﻿// Camada de dados. Nesta fase os dados ficam no aparelho (localStorage) e são
-// sincronizados em tempo real entre abas/janelas via BroadcastChannel.
-// Todas as telas usam apenas useDB()/setDB(), então trocar por uma API REST +
-// WebSocket (Node/Express + MongoDB) exige alterar somente este arquivo.
+﻿// Camada de dados — Supabase (Postgres + login Google + tempo real).
+// As telas usam apenas useDB()/setDB(): cada alteração é comparada com o último estado
+// conhecido do servidor e só as linhas alteradas são gravadas. As regras de acesso (RLS)
+// ficam no banco: o aluno só recebe os próprios dados, o professor os da filial, o admin tudo.
 import { useSyncExternalStore } from 'react';
-import { seed, FAIXAS_PADRAO, MAPA_FAIXAS_ANTIGAS, IDX_PRIMEIRA_PRETA } from './seed';
+import { supabase } from './supabase';
+import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA } from './seed';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl } from './utils';
 
-const KEY = 'mqc_db_v1';
-const SKEY = 'mqc_session_v1';
+const COLECOES = ['filiais', 'professores', 'alunos', 'pagamentos', 'presencas', 'materiais', 'eventos', 'comunicados', 'notificacoes'];
+const UNICOS = ['config', 'termos', 'institucional', 'modelos', 'diretoria', 'precos'];
+
 const listeners = new Set();
-const bc = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('mqc-sync') : null;
-
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const data = JSON.parse(raw);
-      const base = seed();
-      for (const k of Object.keys(base)) if (data[k] === undefined) data[k] = base[k];
-      data.config = { ...base.config, ...data.config };
-      delete data.config.filiacaoMensal;
-      delete data.config.filiacaoAnual;
-      // Plano mensal de filiação foi substituído pela anual (à vista, 3x ou 6x): descarta cobranças pendentes dele
-      data.pagamentos = (data.pagamentos || []).filter((p) => !(p.tipo === 'filiacao' && p.plano === 'mensal' && p.status === 'pendente'));
-      // Migração: acesso do Administrador exclusivamente pela conta Google oficial
-      if (data.config.adminEmail === 'associacaomaochuen@gmail.com') data.config.adminEmail = base.config.adminEmail;
-      delete data.config.adminUser;
-      delete data.config.adminPass;
-      // Migração: carteirinhas passam a usar o modelo oficial (frente + verso)
-      if (!data.modelos?.aluno?.oficial) data.modelos = base.modelos;
-      // Migração: sistema oficial de graduação (Iniciante › Intermediária › Avançado › Professor)
-      if (!data.config.faixas?.[0]?.nivel) {
-        const conv = (i) => (typeof i === 'number' ? MAPA_FAIXAS_ANTIGAS[i] ?? 0 : i);
-        data.config.faixas = FAIXAS_PADRAO;
-        data.alunos.forEach((a) => {
-          a.faixaIdx = conv(a.faixaIdx);
-          (a.historicoGraduacao || []).forEach((h) => (h.faixaIdx = conv(h.faixaIdx)));
-        });
-        data.professores.forEach((p) => (p.faixaIdx = Math.max(IDX_PRIMEIRA_PRETA, conv(p.faixaIdx))));
-        data.materiais.forEach((m) => (m.faixaIdx = conv(m.faixaIdx)));
-      }
-      return data;
-    }
-  } catch {}
-  return seed();
-}
-
-let state = load();
-persist(); // grava eventuais migrações
-let session = (() => {
-  try {
-    return JSON.parse(localStorage.getItem(SKEY)) || null;
-  } catch {
-    return null;
-  }
-})();
-
 const emit = () => listeners.forEach((l) => l());
 const subscribe = (l) => (listeners.add(l), () => listeners.delete(l));
+const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-function persist() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    alert('O armazenamento do aparelho está cheio. Use links externos para vídeos/arquivos grandes.');
-  }
+let state = seed(); // valores padrão até o carregamento
+let servidor = null; // último estado confirmado no servidor (base do diff)
+let session = null; // { role, id } — painel atual
+let auth = { status: 'carregando' }; // carregando | anon | novo | pronto | recusado | erro
+let sessaoSupabase = null;
+const recentes = new Map(); // gravações locais recentes (ignora o eco do tempo real)
+
+/** Completa o que vier do banco com os padrões do app */
+function normalizar(data) {
+  const base = seed();
+  for (const k of [...UNICOS, ...COLECOES]) if (data[k] === undefined || data[k] === null) data[k] = base[k];
+  data.config = { ...base.config, ...data.config };
+  if (!data.config.faixas?.[0]?.nivel) data.config.faixas = FAIXAS_PADRAO;
+  if (!data.modelos?.aluno?.oficial) data.modelos = base.modelos;
+  data.notificacoes.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+  return data;
 }
 
 export function getDB() {
   return state;
 }
 
-/** Atualiza o banco alterando o rascunho: setDB(db => { db.alunos.push(...) }). O retorno da função é ignorado. */
+/** Atualiza alterando o rascunho: setDB(db => { db.alunos.push(...) }). O retorno da função é ignorado. */
 export function setDB(fn) {
   const draft = structuredClone(state);
   fn(draft);
   replaceDB(draft);
 }
 
-/** Substitui o banco inteiro (restauração de backup, rotinas automáticas) */
+/** Substitui o estado inteiro (rotinas automáticas, restauração de backup) */
 export function replaceDB(data) {
   state = data;
-  persist();
   emit();
-  bc?.postMessage('db');
+  agendarSync();
 }
 
 export function resetDB() {
-  state = seed();
-  persist();
-  emit();
-  bc?.postMessage('db');
+  replaceDB(seed());
 }
 
 export const useDB = () => useSyncExternalStore(subscribe, () => state);
-
-// ---------- Sessão ----------
 export const useSession = () => useSyncExternalStore(subscribe, () => session);
-export function setSession(s) {
-  session = s;
-  if (s) localStorage.setItem(SKEY, JSON.stringify(s));
-  else localStorage.removeItem(SKEY);
+export const useAuth = () => useSyncExternalStore(subscribe, () => auth);
+
+// ---------- Sincronização com o Supabase ----------
+let timer = null;
+let fila = Promise.resolve();
+
+function agendarSync() {
+  if (!sessaoSupabase || !servidor) return;
+  clearTimeout(timer);
+  timer = setTimeout(() => sincronizar(), 250);
+}
+
+/** Grava imediatamente o que estiver pendente */
+export function flush() {
+  clearTimeout(timer);
+  return sincronizar();
+}
+
+function sincronizar() {
+  fila = fila.then(gravarDiferencas).catch(() => {});
+  return fila;
+}
+
+async function gravarDiferencas() {
+  if (!sessaoSupabase || !servidor) return;
+  const alvo = state;
+  const base = servidor;
+  let falhou = null;
+  const agora = Date.now();
+
+  for (const col of COLECOES) {
+    const antes = new Map((base[col] || []).map((r) => [r.id, r]));
+    const depois = new Map((alvo[col] || []).map((r) => [r.id, r]));
+    const gravar = [];
+    for (const [id, row] of depois) if (!antes.has(id) || !igual(antes.get(id), row)) gravar.push({ id, data: row });
+    const apagar = [...antes.keys()].filter((id) => !depois.has(id));
+    for (let i = 0; i < gravar.length; i += 200) {
+      const lote = gravar.slice(i, i + 200);
+      lote.forEach((r) => recentes.set(col + ':' + r.id, agora));
+      const { error } = await supabase.from(col).upsert(lote);
+      if (error) falhou = error;
+    }
+    if (apagar.length) {
+      apagar.forEach((id) => recentes.set(col + ':' + id, agora));
+      const { error } = await supabase.from(col).delete().in('id', apagar);
+      if (error) falhou = error;
+    }
+  }
+  for (const k of UNICOS) {
+    if (!igual(base[k], alvo[k])) {
+      recentes.set('app_config:' + k, agora);
+      const { error } = await supabase.from('app_config').upsert({ id: k, data: alvo[k] });
+      if (error) falhou = error;
+    }
+  }
+  servidor = structuredClone(alvo);
+  if (falhou) {
+    console.error('Falha ao gravar no Supabase:', falhou);
+    window.dispatchEvent(new CustomEvent('mqc-erro', { detail: 'Não foi possível salvar uma alteração (sem permissão ou sem conexão). Os dados foram recarregados.' }));
+    await carregarTudo();
+  }
+}
+
+async function buscar(tabela) {
+  const out = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase.from(tabela).select('id,data').range(de, de + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  return out;
+}
+
+async function carregarTudo() {
+  const logado = !!sessaoSupabase;
+  const [cfg, ...cols] = await Promise.all([buscar('app_config'), ...(logado ? COLECOES.map(buscar) : [])]);
+  const novo = {};
+  cfg.forEach((r) => UNICOS.includes(r.id) && (novo[r.id] = r.data));
+  COLECOES.forEach((c, i) => (novo[c] = (cols[i] || []).map((r) => ({ ...r.data, id: r.id }))));
+  const vazio = !cfg.some((r) => r.id === 'config');
+  state = normalizar(novo);
+  servidor = structuredClone(state);
+  emit();
+  return { vazio };
+}
+
+// ---------- Tempo real ----------
+let canal = null;
+function ligarTempoReal() {
+  desligarTempoReal();
+  canal = supabase.channel('mqc-dados');
+  for (const t of [...COLECOES, 'app_config'])
+    canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, (p) => aplicarRemoto(t, p.eventType, p.new, p.old));
+  canal.subscribe();
+}
+function desligarTempoReal() {
+  if (canal) supabase.removeChannel(canal);
+  canal = null;
+}
+
+function aplicarRemoto(tabela, evento, novo, velho) {
+  const id = novo?.id || velho?.id;
+  if (!id || Date.now() - (recentes.get(tabela + ':' + id) || 0) < 2500) return;
+  if (tabela === 'app_config') {
+    if (!UNICOS.includes(id) || evento === 'DELETE') return;
+    state = normalizar({ ...state, [id]: novo.data });
+    servidor = { ...servidor, [id]: structuredClone(state[id]) };
+    return emit();
+  }
+  // Aluno promovido a professor enquanto está com o app aberto: recarrega com o novo perfil
+  if (tabela === 'professores' && session?.role === 'aluno' && novo?.data?.email?.toLowerCase() === auth.email) return recarregar();
+  const aplicar = (lista = []) => {
+    if (evento === 'DELETE') return lista.filter((r) => r.id !== id);
+    const row = { ...novo.data, id };
+    const i = lista.findIndex((r) => r.id === id);
+    if (i >= 0) return lista.map((r) => (r.id === id ? row : r));
+    return tabela === 'notificacoes' ? [row, ...lista] : [...lista, row];
+  };
+  state = { ...state, [tabela]: aplicar(state[tabela]) };
+  if (servidor) servidor = { ...servidor, [tabela]: aplicar(servidor[tabela]) };
   emit();
 }
 
-if (bc) bc.onmessage = () => ((state = load()), emit());
-window.addEventListener('storage', (e) => {
-  if (e.key === KEY) (state = load()), emit();
+// ---------- Autenticação (Google via Supabase) ----------
+export async function entrarComGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + window.location.pathname, queryParams: { prompt: 'select_account' } },
+  });
+  if (error) throw error;
+}
+
+/** Sair (mantido com este nome porque as telas chamam setSession(null)) */
+export function setSession(s) {
+  if (s === null) supabase.auth.signOut();
+}
+
+let rotinaTimer = null;
+
+async function identificar() {
+  const { data: quem, error } = await supabase.rpc('mq_whoami');
+  if (error) throw error;
+  const meta = sessaoSupabase.user.user_metadata || {};
+  const foto = meta.avatar_url || meta.picture || null;
+  const email = (quem.email || '').toLowerCase();
+  const agora = new Date().toISOString();
+  clearInterval(rotinaTimer);
+
+  if (quem.admin) {
+    session = { role: 'admin', id: 'admin' };
+  } else if (quem.professor_id) {
+    session = { role: 'professor', id: quem.professor_id };
+    setDB((d) => {
+      const p = d.professores.find((x) => x.id === quem.professor_id);
+      if (p) {
+        if (!p.foto && foto) p.foto = foto;
+        p.ultimoAcesso = agora;
+      }
+    });
+  } else if (quem.aluno_id) {
+    const a = state.alunos.find((x) => x.id === quem.aluno_id);
+    if (a?.status === 'recusado') {
+      session = null;
+      auth = { status: 'recusado', email };
+      return emit();
+    }
+    session = { role: 'aluno', id: quem.aluno_id };
+    setDB((d) => {
+      const x = d.alunos.find((y) => y.id === quem.aluno_id);
+      if (x) {
+        if (!x.foto && foto) x.foto = foto;
+        x.ultimoAcesso = agora;
+      }
+    });
+  } else {
+    // Primeiro acesso: abre o formulário de cadastro
+    session = null;
+    auth = { status: 'novo', email, nome: meta.full_name || meta.name || '', foto };
+    return emit();
+  }
+  auth = { status: 'pronto', email };
+  emit();
+  if (session.role !== 'aluno') {
+    rotinaFinanceira();
+    rotinaTimer = setInterval(rotinaFinanceira, 60 * 60 * 1000);
+  }
+}
+
+async function processarSessao(s) {
+  sessaoSupabase = s;
+  try {
+    if (!s) {
+      clearInterval(rotinaTimer);
+      desligarTempoReal();
+      session = null;
+      auth = { status: 'anon' };
+      state = seed();
+      servidor = null;
+      emit();
+      await carregarTudo().catch(() => {});
+      return;
+    }
+    auth = { status: 'carregando', email: s.user.email };
+    emit();
+    const { vazio } = await carregarTudo();
+    const { data: quem } = await supabase.rpc('mq_whoami');
+    // Primeiro acesso do administrador num banco vazio: grava a configuração inicial
+    if (vazio && quem?.admin) {
+      const base = seed();
+      const inicial = structuredClone(state);
+      for (const c of ['filiais', 'materiais', 'eventos', 'comunicados']) if (!inicial[c].length) inicial[c] = base[c];
+      servidor = { ...servidor, ...Object.fromEntries(UNICOS.map((k) => [k, null])) };
+      state = inicial;
+      emit();
+      await flush();
+    }
+    ligarTempoReal();
+    await identificar();
+  } catch (e) {
+    console.error(e);
+    auth = { status: 'erro', mensagem: e.message || String(e) };
+    emit();
+  }
+}
+
+/** Recarrega dados e perfil (após cadastro, promoção ou aprovação) */
+export async function recarregar() {
+  if (!sessaoSupabase) return;
+  await flush();
+  await carregarTudo();
+  await identificar();
+}
+
+let ultimoUsuario = null;
+supabase.auth.onAuthStateChange((evento, s) => {
+  // Renovação de token não recarrega nada
+  const id = s?.user?.id || null;
+  if (evento === 'TOKEN_REFRESHED' && id === ultimoUsuario) return (sessaoSupabase = s);
+  if (evento !== 'INITIAL_SESSION' && evento !== 'SIGNED_IN' && evento !== 'SIGNED_OUT') return;
+  if (evento === 'SIGNED_IN' && id === ultimoUsuario && auth.status === 'pronto') return;
+  ultimoUsuario = id;
+  if (location.search.includes('code=')) history.replaceState(null, '', location.pathname + location.hash);
+  setTimeout(() => processarSessao(s), 0);
+});
+
+// Ao voltar para o app (aba/tela reaberta), busca o que mudou enquanto estava fora
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && sessaoSupabase && auth.status === 'pronto') flush().then(carregarTudo).catch(() => {});
 });
 
 // ---------- Notificações ----------
 /** para: 'admin' | userId | 'filial:<id>' | 'todos' */
 export function notify(db, para, titulo, texto = '') {
   db.notificacoes.unshift({ id: uid('n'), para, titulo, texto, data: new Date().toISOString(), lida: [] });
-  db.notificacoes = db.notificacoes.slice(0, 300);
 }
 
 export function notificacoesDe(db, user) {
@@ -305,7 +503,8 @@ export function confirmarPagamento(db, pagId, por, metodo = 'manual') {
 export function novoAluno(db, dados) {
   const a = {
     id: uid('al'),
-    matricula: 'MQ' + String(db.alunos.length + 1001),
+    // Matrícula única mesmo quando o próprio aluno se cadastra (ele não enxerga os demais)
+    matricula: 'MQ' + Date.now().toString(36).toUpperCase().slice(-6),
     status: 'pendente',
     faixaIdx: 0,
     foto: null,

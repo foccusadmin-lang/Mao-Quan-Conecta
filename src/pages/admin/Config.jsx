@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { useDB, setDB, replaceDB, carregarDemo, limparDemo, resetDB } from '../../lib/db';
+import { useDB, setDB, replaceDB } from '../../lib/db';
 import { uid } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo } from '../../components/ui';
 import { FAIXAS_PADRAO, NIVEIS } from '../../lib/seed';
@@ -93,7 +93,7 @@ export default function Config() {
 
         <Card title="🔐 Acesso & Suporte">
           <div className="form-grid">
-            <Field label="Conta Google do Administrador" hint="Única conta com acesso à Central Mao"><Inp obj={c} set={setC} k="adminEmail" type="email" /></Field>
+            <Field label="Conta Google do Administrador" hint="Definida no servidor (Supabase) por segurança"><input value={c.adminEmail} disabled /></Field>
             <Field label="WhatsApp suporte (com DDI)"><Inp obj={c} set={setC} k="whatsapp" /></Field>
             <Field label="Nome do suporte"><Inp obj={c} set={setC} k="suporteNome" /></Field>
           </div>
@@ -154,11 +154,6 @@ export default function Config() {
               ⬆ Restaurar backup
               <input type="file" accept="application/json" hidden onChange={(e) => e.target.files[0] && importar(e.target.files[0])} />
             </label>
-          </div>
-          <div className="row mt">
-            <button className="btn ghost sm" onClick={() => (carregarDemo(), toast('Dados de demonstração carregados.'))}>Carregar demonstração</button>
-            <button className="btn ghost sm" onClick={() => (limparDemo(), toast('Demonstração removida.'))}>Remover demonstração</button>
-            <button className="btn ghost sm" style={{ color: 'var(--red)' }} onClick={() => ask('Apagar TODOS os dados e voltar ao estado inicial? Faça um backup antes.', () => (resetDB(), location.reload()), 'Apagar tudo')}>Zerar sistema</button>
           </div>
         </Card>
       </div>

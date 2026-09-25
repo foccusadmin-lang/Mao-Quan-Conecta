@@ -1,8 +1,9 @@
 ﻿import { useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
-import { useDB, useSession, rotinaFinanceira, temRecurso } from './lib/db';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { useDB, useSession, useAuth, setSession, temRecurso } from './lib/db';
+import PrimeiroAcesso from './pages/PrimeiroAcesso';
 import Layout from './components/Layout';
-import { Toaster } from './components/ui';
+import { Toaster, toast } from './components/ui';
 import Login from './pages/Login';
 import Validar from './pages/Validar';
 import Patrocinador from './pages/Patrocinador';
@@ -61,12 +62,22 @@ function useCurrentUser() {
 
 export default function App() {
   const user = useCurrentUser();
+  const auth = useAuth();
+  const loc = useLocation();
   useEffect(() => {
-    rotinaFinanceira();
-    const t = setInterval(rotinaFinanceira, 60 * 60 * 1000);
-    return () => clearInterval(t);
+    const aviso = (e) => toast(e.detail);
+    window.addEventListener('mqc-erro', aviso);
+    return () => window.removeEventListener('mqc-erro', aviso);
   }, []);
 
+  // Páginas públicas (validação do QR e patrocinador) não dependem de login
+  const publica = /^\/(validar|patrocinador)/.test(loc.pathname);
+  if (!publica && auth.status === 'carregando') return <TelaStatus titulo="Conectando…" texto="Carregando seus dados com segurança." />;
+  if (!publica && auth.status === 'novo') return <><PrimeiroAcesso /><Toaster /></>;
+  if (!publica && auth.status === 'recusado')
+    return <TelaStatus titulo="Cadastro não aprovado" texto={`A conta ${auth.email} não foi aprovada. Fale com o professor da sua filial.`} sair />;
+  if (!publica && auth.status === 'erro')
+    return <TelaStatus titulo="Não foi possível conectar" texto={auth.mensagem} sair recarregar />;
   const home = user ? '/' + user.role : '/login';
 
   return (
@@ -132,5 +143,21 @@ export default function App() {
       </Routes>
       <Toaster />
     </>
+  );
+}
+
+function TelaStatus({ titulo, texto, sair, recarregar }) {
+  return (
+    <div style={{ minHeight: '100%', background: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="card pad-lg center" style={{ maxWidth: 420, width: '100%' }}>
+        <img src="./logo.webp" alt="" style={{ width: 90 }} />
+        <h2 style={{ marginTop: 10 }}>{titulo}</h2>
+        <p className="muted">{texto}</p>
+        <div className="row" style={{ justifyContent: 'center' }}>
+          {recarregar && <button className="btn" onClick={() => location.reload()}>Tentar de novo</button>}
+          {sair && <button className="btn ghost" onClick={() => setSession(null)}>Sair</button>}
+        </div>
+      </div>
+    </div>
   );
 }
