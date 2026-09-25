@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useDB, setDB } from '../../lib/db';
-import { brl, uid } from '../../lib/utils';
+import { brl, uid, waLink } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, useConfirm, toast, Empty } from '../../components/ui';
 
-const vazio = { nome: '', cidade: '', endereco: '', professorId: '', mensalidade: 120, aulasSemana: 2, minFrequencia: 75, maxFaltas: 6, ativa: true };
+const vazio = { nome: '', cidade: '', endereco: '', responsaveis: '', telefone: '', email: '', professorId: '', mensalidade: 120, aulasSemana: 2, minFrequencia: 75, maxFaltas: 6, ativa: true };
 
 export default function Filiais() {
   const db = useDB();
@@ -49,7 +49,14 @@ export default function Filiais() {
                 <span className="badge gold">{brl(f.mensalidade)}/mês</span>
               </div>
               <h3 style={{ marginTop: 10 }}>{f.nome}</h3>
-              <div className="small muted">{f.cidade}{f.endereco && ' · ' + f.endereco}</div>
+              <div className="small muted">📍 {f.endereco ? `${f.endereco} · ` : ''}{f.cidade}</div>
+              {f.responsaveis && <div className="small" style={{ marginTop: 4 }}>👥 {f.responsaveis}</div>}
+              {(f.telefone || f.email) && (
+                <div className="row small" style={{ marginTop: 4, gap: 8 }}>
+                  {f.telefone && <a href={waLink('55' + f.telefone.replace(/\D/g, ''), `Olá! Contato pela filial ${f.nome} — Mao Quan Conecta.`)} target="_blank" rel="noreferrer">📞 {f.telefone}</a>}
+                  {f.email && <a href={`mailto:${f.email}`}>✉️ {f.email}</a>}
+                </div>
+              )}
               <div className="list-item">
                 <Avatar src={p?.foto} name={p?.nome || '?'} />
                 <div className="grow">
@@ -78,6 +85,9 @@ export default function Filiais() {
               <Field label="Nome da filial"><Inp obj={edit} set={setEdit} k="nome" /></Field>
               <Field label="Cidade"><Inp obj={edit} set={setEdit} k="cidade" /></Field>
               <Field label="Endereço" style={{ gridColumn: '1/-1' }}><Inp obj={edit} set={setEdit} k="endereco" /></Field>
+              <Field label="Responsáveis" style={{ gridColumn: '1/-1' }} hint="Nomes como aparecem na divulgação (ex.: Laoshi Alan, Jiàoliàn Lilian)"><Inp obj={edit} set={setEdit} k="responsaveis" /></Field>
+              <Field label="Telefone / WhatsApp"><Inp obj={edit} set={setEdit} k="telefone" type="tel" /></Field>
+              <Field label="E-mail"><Inp obj={edit} set={setEdit} k="email" type="email" /></Field>
               <Field label="Mensalidade (R$)" hint="Valor específico desta filial"><Inp obj={edit} set={setEdit} k="mensalidade" type="number" min="0" step="0.01" /></Field>
               <Field label="Aulas por semana"><Inp obj={edit} set={setEdit} k="aulasSemana" type="number" min="1" /></Field>
               <Field label="Frequência mínima p/ exame (%)"><Inp obj={edit} set={setEdit} k="minFrequencia" type="number" min="0" max="100" /></Field>

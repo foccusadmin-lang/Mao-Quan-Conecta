@@ -65,13 +65,23 @@ export const MODELOS_PADRAO = () => ({
 
 export function seed() {
   const hoje = todayISO();
+  // Filiais oficiais da Associação
   const filiais = [
-    'Sede (Matriz)', 'Osasco', 'Filial 03', 'Filial 04', 'Filial 05', 'Filial 06', 'Filial 07', 'Filial 08', 'Filial 09',
-  ].map((nome, i) => ({
+    ['Barueri — Sede', 'Barueri - SP', 'R. Rio Grande do Sul, 172', 'Mestre Francisco, Laoshi Alan, Jiàoliàn Lilian Stocco e Josenilson Oliveira', '(11) 97298-5292', ''],
+    ['Barueri — Complexo Esportivo', 'Barueri - SP', 'Av. Presidente Washington Luis, 280', 'Laoshi Alan Morais e Almir Pereira', '(11) 98807-5406', ''],
+    ['Barueri — Parque Imperial', 'Barueri - SP', 'R. Duarte da Costa, 878', 'Laoshi Valdecir', '(11) 4191-8070', 'valdecir.ex@hotmail.com'],
+    ['Carapicuíba — COHAB 2', 'Carapicuíba - SP', 'Av. Amazonas, 907', 'Laoshi Williams Bezerra', '(11) 96013-3965', 'gremioverde@yahoo.com.br'],
+    ['Jandira — Jardim Jandira', 'Jandira - SP', 'R. Massao Yamamoto, 29', 'Laoshi André', '(11) 97438-7592', ''],
+    ['Osasco — Vila Osasco', 'Osasco - SP', 'Av. Dionysia Alves Barreto, 151', 'Laoshi Alisson', '(11) 98416-4898', ''],
+    ['Guarulhos — Jardim Diogo', 'Guarulhos - SP', 'R. Santana do Deserto, 87', 'Laoshi Anderson Dutra', '(11) 98578-7134', 'andersoncdutra@hotmail.com'],
+  ].map(([nome, cidade, endereco, responsaveis, telefone, email], i) => ({
     id: 'fil' + (i + 1),
     nome,
-    cidade: i === 1 ? 'Osasco - SP' : 'São Paulo - SP',
-    endereco: '',
+    cidade,
+    endereco,
+    responsaveis,
+    telefone,
+    email,
     professorId: null,
     mensalidade: 120,
     aulasSemana: 2,
@@ -93,7 +103,7 @@ export function seed() {
       { id: uid('m'), titulo: 'Didática para Laoshi — Módulo 1', tipo: 'teoria', faixaIdx: 0, url: '', arquivo: null, descricao: 'Capacitação técnica para professores.', publico: 'professor', criadoEm: hoje },
     ],
     eventos: [
-      { id: uid('e'), titulo: 'Exame de Graduação Semestral', tipo: 'exame', data: addDays(hoje, 30), hora: '09:00', local: 'Sede (Matriz)', descricao: 'Exame oficial de troca de faixa. Somente alunos aptos no pré-exame.', capa: null, meet: '', publico: 'todos', confirmados: [] },
+      { id: uid('e'), titulo: 'Exame de Graduação Semestral', tipo: 'exame', data: addDays(hoje, 30), hora: '09:00', local: 'Barueri — Sede', descricao: 'Exame oficial de troca de faixa. Somente alunos aptos no pré-exame.', capa: null, meet: '', publico: 'todos', confirmados: [] },
       { id: uid('e'), titulo: 'Reunião de Professores', tipo: 'reuniao', data: addDays(hoje, 10), hora: '20:00', local: 'Online', descricao: 'Alinhamento técnico e calendário.', capa: null, meet: 'https://meet.google.com/', publico: 'professores', confirmados: [] },
     ],
     comunicados: [
