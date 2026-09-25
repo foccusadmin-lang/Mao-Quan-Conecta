@@ -74,7 +74,21 @@ export default function VitrineAtleta() {
                 </svg>
               </a>
             )}
-            {v.youtube && <a className="btn dark" href={v.youtube} target="_blank" rel="noreferrer">▶ YouTube</a>}
+            {v.youtube && (
+              <a
+                className="btn dark icon"
+                href={/^https?:\/\//.test(v.youtube.trim()) ? v.youtube.trim() : /^(www\.)?(youtube\.com|youtu\.be)\//.test(v.youtube.trim()) ? `https://${v.youtube.trim()}` : `https://youtube.com/@${v.youtube.trim().replace(/^@/, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="YouTube"
+                title="YouTube"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="1.5" y="4.5" width="21" height="15" rx="4.5" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <path d="M10 8.8v6.4l5.4-3.2z" fill="currentColor" />
+                </svg>
+              </a>
+            )}
             <button className="btn dark" onClick={() => (navigator.share ? navigator.share({ title: v.nome, url }).catch(() => {}) : copy(url).then(() => toast('Link copiado!')))}>📤 Compartilhar</button>
           </div>
         </div>
