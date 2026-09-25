@@ -10,6 +10,13 @@ const GoogleG = () => (
 export default function Login() {
   const db = useDB();
   const [indo, setIndo] = useState(false);
+  // Erro devolvido pelo Google/Supabase na volta do login (ex.: chave do cliente inválida)
+  const [erro] = useState(() => {
+    const q = new URLSearchParams(window.location.search);
+    const msg = q.get('error_description') || q.get('error');
+    if (msg) history.replaceState(null, '', window.location.pathname + window.location.hash);
+    return msg;
+  });
 
   // Login oficial do Google via Supabase: a conta é confirmada no servidor e o painel é decidido pelo e-mail
   const entrar = async () => {
@@ -34,6 +41,15 @@ export default function Login() {
         <div className="login-card">
           <h2 className="brush" style={{ fontSize: 30, margin: 0 }}>Bem-vindo(a)</h2>
           <p className="muted" style={{ marginTop: 4 }}>Entre com a sua conta Google</p>
+          {erro && (
+            <div className="alert red mt small">
+              <div>
+                <b>Não foi possível concluir o login com o Google.</b>
+                <div className="xs" style={{ marginTop: 4 }}>{erro}</div>
+                <div className="xs" style={{ marginTop: 4 }}>Tente novamente. Se continuar, fale com o suporte.</div>
+              </div>
+            </div>
+          )}
           <div className="col mt">
             <button className="btn gbtn block" onClick={entrar} disabled={indo} style={{ minHeight: 48 }}>
               <GoogleG /> {indo ? 'Abrindo o Google…' : 'Entrar com Google'}
