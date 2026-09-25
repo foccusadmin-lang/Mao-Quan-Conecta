@@ -363,3 +363,26 @@ tr:last-child td { border-bottom: 0; }
 .idc .idc-qr img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .idc.editing .f { outline: 1px dashed rgba(208, 18, 27, 0.6); cursor: move; touch-action: none; }
 .idc.editing .f.sel { outline: 2px solid var(--gold); }
+
+/* ---------- Carreira / Vitrine do atleta ---------- */
+.quadro-medalhas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+@media (max-width: 760px) { .quadro-medalhas { grid-template-columns: repeat(3, 1fr); } }
+.qm { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px; text-align: center; }
+.qm.escuro { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.14); color: #fff; }
+.qm-i { font-size: 26px; line-height: 1; }
+.qm-n { font-size: 26px; font-weight: 800; margin-top: 4px; }
+.qm-l { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.75; font-weight: 600; }
+.galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.galeria-item { position: relative; border-radius: 12px; overflow: hidden; background: #111; }
+.galeria-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: zoom-in; }
+.galeria-item video { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #000; }
+.galeria-item .video { border-radius: 0; aspect-ratio: 1; }
+.galeria-legenda { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 8px; font-size: 12.5px; color: #fff; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); pointer-events: none; }
+.galeria-remover { position: absolute; top: 6px; right: 6px; min-height: 30px; }
+.vitrine-hero { background: radial-gradient(circle at 85% 10%, rgba(208, 18, 27, 0.55), transparent 55%), linear-gradient(160deg, #141414 20%, #2a0a0c 75%, #9e0c13); color: #fff; padding: 34px 18px 28px; padding-top: calc(34px + env(safe-area-inset-top)); position: relative; overflow: hidden; }
+.vitrine-hero::after { content: '運動員'; font-family: var(--han); position: absolute; right: -10px; bottom: -30px; font-size: 130px; color: rgba(255, 255, 255, 0.05); writing-mode: vertical-rl; }
+.vitrine-hero .inner { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
+.vitrine-foto { width: 128px; height: 128px; border-radius: 50%; object-fit: cover; border: 4px solid var(--red); background: #333; flex: none; }
+.vitrine-nome { font-family: var(--brush); font-weight: 400; font-size: clamp(30px, 6vw, 48px); line-height: 1.05; margin: 0; }
+.vitrine-sec { max-width: 1000px; margin: 0 auto; padding: 22px 16px; }
+.vitrine-sec h2 { font-family: var(--brush); font-weight: 400; font-size: 26px; }

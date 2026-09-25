@@ -60,7 +60,9 @@ export default function Layout({ user }) {
   const loc = useLocation();
   const base = '/' + user.role;
   const nav = NAVS[user.role].filter(([p]) => !(p === 'atleta' && !user.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
-  const current = nav.find(([p]) => loc.pathname === (p ? `${base}/${p}` : base)) || nav[0];
+  const EXTRAS = { carreira: 'Construir Carreira' };
+  const extra = EXTRAS[loc.pathname.split('/')[2]];
+  const current = nav.find(([p]) => loc.pathname === (p ? `${base}/${p}` : base)) || (extra ? ['', '', extra] : nav[0]);
   const notes = notificacoesDe(db, user);
   const unread = notes.filter((n) => !n.lida.includes(user.id)).length;
 

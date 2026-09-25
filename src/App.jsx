@@ -24,6 +24,8 @@ import Eventos from './pages/shared/Eventos';
 import Comunicados from './pages/shared/Comunicados';
 import Materiais from './pages/shared/Materiais';
 import OndeTreinar from './pages/shared/OndeTreinar';
+import Carreira from './pages/aluno/Carreira';
+import VitrineAtleta from './pages/VitrineAtleta';
 
 import ProfDashboard from './pages/professor/Dashboard';
 import Presenca from './pages/professor/Presenca';
@@ -72,7 +74,7 @@ export default function App() {
   }, []);
 
   // Páginas públicas (validação do QR e patrocinador) não dependem de login
-  const publica = /^\/(validar|patrocinador)/.test(loc.pathname);
+  const publica = /^\/(validar|patrocinador|atleta)\//.test(loc.pathname + '/');
   if (!publica && auth.status === 'carregando') return <TelaStatus titulo="Conectando…" texto="Carregando seus dados com segurança." />;
   if (!publica && auth.status === 'novo') return <><PrimeiroAcesso /><Toaster /></>;
   if (!publica && auth.status === 'recusado')
@@ -87,6 +89,7 @@ export default function App() {
         <Route path="/login" element={user ? <Navigate to={home} replace /> : <Login />} />
         <Route path="/validar/:payload" element={<Validar />} />
         <Route path="/patrocinador/:token?" element={<Patrocinador />} />
+        <Route path="/atleta/:slug" element={<VitrineAtleta />} />
 
         {user?.role === 'admin' && (
           <Route path="/admin" element={<Layout user={user} />}>
@@ -133,6 +136,7 @@ export default function App() {
               <Route path="presenca" element={<AlunoPresenca user={user} />} />
               <Route path="eventos" element={<Eventos user={user} />} />
               <Route path="atleta" element={<Atleta user={user} />} />
+              <Route path="carreira" element={<Carreira user={user} />} />
               <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
               <Route path="institucional" element={<><PageHead title="Institucional" sub="Linhagem, história e o código de ética Wu De" /><Institucional /></>} />
               <Route path="diretoria" element={<><PageHead title="Diretoria 2025" sub="Diretores em atuação na vigência atual" /><DiretoriaList /></>} />
