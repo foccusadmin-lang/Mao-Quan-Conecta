@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+﻿import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { buscarVitrinePublica, estatisticas } from '../lib/vitrine';
 import { waLink, copy, fmtDate } from '../lib/utils';
 import { toast, Empty } from '../components/ui';
-import { WhatsFab } from '../components/shared';
 import { QuadroMedalhas, ListaConquistas, Galeria, PixDoacao } from '../components/Vitrine';
 
 /** Vitrine pública do atleta — aberta sem login pelo link personalizado #/atleta/<nome> */
@@ -28,8 +27,7 @@ export default function VitrineAtleta() {
       <div className="vitrine-sec center">
         <img src="./logo.webp" alt="" style={{ width: 110 }} />
         <h2>Vitrine não encontrada</h2>
-        <p className="muted">Este link não existe ou o atleta ainda não publicou a vitrine.</p>
-        <Link to="/" className="btn">Conhecer o Mao Quan Conecta</Link>
+        <p className="muted">Este link não existe ou o atleta ainda não publicou a vitrine. Confira o endereço com o atleta que o compartilhou.</p>
       </div>
     );
 
@@ -141,9 +139,7 @@ export default function VitrineAtleta() {
       <footer className="vitrine-sec center small muted" style={{ paddingBottom: 90 }}>
         <img src="./logo.webp" alt="" style={{ width: 60 }} />
         <div>Atleta filiado à <b>Associação Mao Quan Kung Fu Wushu</b></div>
-        <Link to="/">maoquanconecta.com.br</Link>
       </footer>
-      <WhatsFab />
     </div>
   );
 }
