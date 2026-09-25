@@ -58,7 +58,22 @@ export default function VitrineAtleta() {
           <div className="mt"><QuadroMedalhas vitrine={v} escuro /></div>
           <div className="row mt">
             {temPatrocinio && <a className="btn gold" href="#patrocinar" onClick={(e) => (e.preventDefault(), document.getElementById('patrocinar')?.scrollIntoView({ behavior: 'smooth' }))}>🤝 Patrocinar este atleta</a>}
-            {v.instagram && <a className="btn dark" href={`https://instagram.com/${v.instagram}`} target="_blank" rel="noreferrer">📸 @{v.instagram}</a>}
+            {v.instagram && (
+              <a
+                className="btn dark icon"
+                href={/^https?:\/\//.test(v.instagram) ? v.instagram : `https://instagram.com/${v.instagram.replace(/^@/, '')}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Instagram"
+                title="Instagram"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="2" y="2" width="20" height="20" rx="5" />
+                  <circle cx="12" cy="12" r="4.2" />
+                  <circle cx="17.6" cy="6.4" r="1" fill="currentColor" stroke="none" />
+                </svg>
+              </a>
+            )}
             {v.youtube && <a className="btn dark" href={v.youtube} target="_blank" rel="noreferrer">▶ YouTube</a>}
             <button className="btn dark" onClick={() => (navigator.share ? navigator.share({ title: v.nome, url }).catch(() => {}) : copy(url).then(() => toast('Link copiado!')))}>📤 Compartilhar</button>
           </div>
