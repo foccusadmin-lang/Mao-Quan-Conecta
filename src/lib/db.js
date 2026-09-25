@@ -103,14 +103,28 @@ async function gravarDiferencas() {
   for (const col of COLECOES) {
     const antes = new Map((base[col] || []).map((r) => [r.id, r]));
     const depois = new Map((alvo[col] || []).map((r) => [r.id, r]));
-    const gravar = [];
-    for (const [id, row] of depois) if (!antes.has(id) || !igual(antes.get(id), row)) gravar.push({ id, data: row });
+    // Registros novos são INSERIDOS e os existentes ATUALIZADOS. (Upsert exigiria permissão de
+    // criação mesmo para uma simples alteração — ex.: aluno confirmando presença num evento.)
+    const novos = [];
+    const alterados = [];
+    for (const [id, row] of depois) {
+      if (!antes.has(id)) novos.push({ id, data: row });
+      else if (!igual(antes.get(id), row)) alterados.push({ id, data: row });
+    }
     const apagar = [...antes.keys()].filter((id) => !depois.has(id));
-    for (let i = 0; i < gravar.length; i += 200) {
-      const lote = gravar.slice(i, i + 200);
-      lote.forEach((r) => recentes.set(col + ':' + r.id, agora));
-      const { error } = await supabase.from(col).upsert(lote);
-      if (error) falhou = error;
+    [...novos, ...alterados].forEach((r) => recentes.set(col + ':' + r.id, agora));
+    for (let i = 0; i < novos.length; i += 200) {
+      const lote = novos.slice(i, i + 200);
+      const { error } = await supabase.from(col).insert(lote);
+      // Já existia no servidor (criado em outro aparelho): vira atualização
+      if (error?.code === '23505') alterados.push(...lote);
+      else if (error) falhou = error;
+    }
+    for (let i = 0; i < alterados.length; i += 8) {
+      const resultados = await Promise.all(
+        alterados.slice(i, i + 8).map((r) => supabase.from(col).update({ data: r.data }).eq('id', r.id))
+      );
+      resultados.forEach(({ error }) => error && (falhou = error));
     }
     if (apagar.length) {
       apagar.forEach((id) => recentes.set(col + ':' + id, agora));
@@ -121,7 +135,10 @@ async function gravarDiferencas() {
   for (const k of UNICOS) {
     if (!igual(base[k], alvo[k])) {
       recentes.set('app_config:' + k, agora);
-      const { error } = await supabase.from('app_config').upsert({ id: k, data: alvo[k] });
+      const existe = base[k] !== null && base[k] !== undefined;
+      const { error } = existe
+        ? await supabase.from('app_config').update({ data: alvo[k] }).eq('id', k)
+        : await supabase.from('app_config').insert({ id: k, data: alvo[k] });
       if (error) falhou = error;
     }
   }
