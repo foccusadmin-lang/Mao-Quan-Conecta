@@ -1,4 +1,4 @@
-export const uid = (p = '') => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
+﻿export const uid = (p = '') => p + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 
 const pad = (n) => String(n).padStart(2, '0');
 export const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -115,7 +115,23 @@ export const b64d = (s) => {
 // Máscaras de documentos
 export const maskCPF = (v = '') =>
   v.replace(/\D/g, '').slice(0, 11).replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-export const maskRG = (v = '') => v.toUpperCase().replace(/[^0-9X.\-]/g, '').slice(0, 14);
+// RG no padrão 00.000.000-0 (o dígito final pode ser X)
+export const maskRG = (v = '') => {
+  const s = v.toUpperCase().replace(/[^0-9X]/g, '').replace(/X(?=.)/g, '').slice(0, 9);
+  return s
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})([0-9X])/, '$1.$2.$3-$4');
+};
+// Telefone: (11) 90000-0000 (celular) ou (11) 4000-0000 (fixo)
+export const maskTelefone = (v = '') => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (!d) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+};
 
 export const addMonths = (iso, n) => {
   const d = new Date(iso + 'T12:00:00');

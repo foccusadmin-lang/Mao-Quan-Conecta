@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { IDX_PRIMEIRA_PRETA } from '../../lib/seed';
 import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso } from '../../lib/db';
-import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG } from '../../lib/utils';
+import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 
 const TITULOS = ['Shifu', 'Laoshi', 'Jiǎngshī', 'Jiàoliàn', 'Zhùjiào'];
@@ -99,10 +99,10 @@ export default function Professores() {
             <div className="form-grid">
               <Field label="Nome completo"><Inp obj={edit} set={setEdit} k="nome" /></Field>
               <Field label="E-mail de login (Google)"><Inp obj={edit} set={setEdit} k="email" type="email" /></Field>
-              <Field label="Telefone"><Inp obj={edit} set={setEdit} k="telefone" type="tel" /></Field>
+              <Field label="Telefone"><Inp obj={edit} set={setEdit} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
               <Field label="Nascimento"><Inp obj={edit} set={setEdit} k="nascimento" type="date" /></Field>
-              <Field label="RG"><input value={edit.rg || ''} onChange={(e) => setEdit({ ...edit, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" /></Field>
-              <Field label="CPF"><input value={edit.cpf || ''} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" /></Field>
+              <Field label="RG"><input value={edit.rg || ''} onChange={(e) => setEdit({ ...edit, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
+              <Field label="CPF"><input value={edit.cpf || ''} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
               <Field label="Título">
                 <select value={edit.titulo} onChange={(e) => setEdit({ ...edit, titulo: e.target.value })}>
                   {TITULOS.map((t) => <option key={t}>{t}</option>)}

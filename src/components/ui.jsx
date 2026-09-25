@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+﻿import { useEffect, useState, useSyncExternalStore } from 'react';
 import { initials, readImage } from '../lib/utils';
 import { useDB } from '../lib/db';
 
@@ -76,10 +76,11 @@ export function Field({ label, hint, children, style }) {
 }
 
 /** Input controlado ligado a um objeto: <Inp obj={f} set={setF} k="nome" /> */
-export function Inp({ obj, set, k, type = 'text', ...rest }) {
+export function Inp({ obj, set, k, type = 'text', mask, ...rest }) {
   const v = k.split('.').reduce((o, p) => o?.[p], obj);
   const onChange = (e) => {
-    const val = type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : type === 'checkbox' ? e.target.checked : e.target.value;
+    let val = type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : type === 'checkbox' ? e.target.checked : e.target.value;
+    if (mask) val = mask(val);
     set((prev) => {
       const next = structuredClone(prev);
       const parts = k.split('.');

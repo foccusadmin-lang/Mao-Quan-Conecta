@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, faixaNome, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
-import { fmtDate, todayISO, brl, maskCPF, maskRG } from '../../lib/utils';
+import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
 
@@ -120,7 +120,7 @@ export default function Alunos({ user }) {
             <div className="form-grid">
               <Field label="Nome completo"><input value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} autoFocus /></Field>
               <Field label="E-mail Google do aluno"><input type="email" value={novo.email} onChange={(e) => setNovo({ ...novo, email: e.target.value })} placeholder="aluno@gmail.com" /></Field>
-              <Field label="WhatsApp"><input type="tel" value={novo.telefone} onChange={(e) => setNovo({ ...novo, telefone: e.target.value })} placeholder="(11) 90000-0000" /></Field>
+              <Field label="WhatsApp"><input type="tel" value={novo.telefone} onChange={(e) => setNovo({ ...novo, telefone: maskTelefone(e.target.value) })} placeholder="(11) 90000-0000" /></Field>
               {isAdmin ? (
                 <Field label="Filial">
                   <select value={novo.filialId} onChange={(e) => setNovo({ ...novo, filialId: e.target.value })}>
@@ -194,10 +194,10 @@ function AlunoModal({ id, user, onClose, ask }) {
           <div className="form-grid">
             <Field label="Nome"><Inp obj={f} set={setF} k="nome" /></Field>
             <Field label="E-mail (Google)"><Inp obj={f} set={setF} k="email" type="email" disabled={!isAdmin} /></Field>
-            <Field label="Telefone"><Inp obj={f} set={setF} k="telefone" type="tel" /></Field>
+            <Field label="Telefone"><Inp obj={f} set={setF} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
             <Field label="Nascimento"><Inp obj={f} set={setF} k="nascimento" type="date" /></Field>
-            <Field label="RG"><input value={f.rg || ''} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" /></Field>
-            <Field label="CPF"><input value={f.cpf || ''} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" /></Field>
+            <Field label="RG"><input value={f.rg || ''} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
+            <Field label="CPF"><input value={f.cpf || ''} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
             <Field label="Responsável"><Inp obj={f} set={setF} k="responsavel" /></Field>
             <Field label="Matrícula"><Inp obj={f} set={setF} k="matricula" disabled={!isAdmin} /></Field>
             {isAdmin && (
@@ -305,7 +305,7 @@ function AlunoModal({ id, user, onClose, ask }) {
           <Field label="Histórico de lesões"><Inp obj={f} set={setF} k="saude.lesoes" type="textarea" /></Field>
           <Field label="Restrições médicas" style={{ gridColumn: '1/-1' }}><Inp obj={f} set={setF} k="saude.restricoes" type="textarea" /></Field>
           <Field label="Contato de emergência — nome"><Inp obj={f} set={setF} k="saude.emergenciaNome" /></Field>
-          <Field label="Contato de emergência — telefone"><Inp obj={f} set={setF} k="saude.emergenciaTel" type="tel" /></Field>
+          <Field label="Contato de emergência — telefone"><Inp obj={f} set={setF} k="saude.emergenciaTel" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
         </div>
       )}
 
