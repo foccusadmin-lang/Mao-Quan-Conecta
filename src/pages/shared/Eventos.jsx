@@ -1,10 +1,11 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useDB, setDB, notify } from '../../lib/db';
-import { uid, fmtDate, todayISO, readImage } from '../../lib/utils';
+import { uid, fmtDate, todayISO, readImage, mapsRota } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Tabs, useConfirm, toast, Empty } from '../../components/ui';
+import { LinkMapa, enderecoEvento, enderecoFilial } from '../../components/shared';
 
 const TIPOS = { evento: '🎉 Evento', exame: '🎖️ Exame', campeonato: '🏆 Campeonato', reuniao: '💻 Reunião', estagio: '📚 Estágio técnico' };
-const vazio = { titulo: '', tipo: 'evento', data: todayISO(), hora: '', local: '', descricao: '', capa: null, meet: '', publico: 'todos', confirmados: [] };
+const vazio = { titulo: '', tipo: 'evento', data: todayISO(), hora: '', local: '', endereco: '', descricao: '', capa: null, meet: '', publico: 'todos', confirmados: [] };
 
 export default function Eventos({ user }) {
   const db = useDB();
@@ -58,9 +59,16 @@ export default function Eventos({ user }) {
                   <span className="badge">{TIPOS[e.tipo]}</span>
                 </div>
                 <h3 style={{ marginTop: 10 }}>{e.titulo}</h3>
-                <div className="small muted">📍 {e.local || '—'}{e.publico === 'professores' && ' · 🔒 Professores'}</div>
+                <div className="small muted">
+                  📍 <LinkMapa endereco={enderecoEvento(db, e)}>{e.local || '—'}</LinkMapa>
+                  {e.endereco && e.endereco !== e.local && <div className="xs">{e.endereco}</div>}
+                  {e.publico === 'professores' && ' · 🔒 Professores'}
+                </div>
                 {e.descricao && <p className="small" style={{ whiteSpace: 'pre-line' }}>{e.descricao}</p>}
                 <div className="row">
+                  {enderecoEvento(db, e) && tab === 'proximos' && (
+                    <a className="btn sm ghost" href={mapsRota(enderecoEvento(db, e))} target="_blank" rel="noreferrer">🧭 Como chegar</a>
+                  )}
                   {e.meet && <a className="btn sm dark" href={e.meet} target="_blank" rel="noreferrer">🎥 Google Meet</a>}
                   {!isAdmin && tab === 'proximos' && (
                     <button className={`btn sm ${vou ? 'ok' : 'ghost'}`} onClick={() => toggle(e)}>{vou ? '✔ Presença confirmada' : 'Confirmar presença'}</button>
@@ -110,7 +118,22 @@ export default function Eventos({ user }) {
               </Field>
               <Field label="Data"><Inp obj={edit} set={setEdit} k="data" type="date" /></Field>
               <Field label="Hora"><Inp obj={edit} set={setEdit} k="hora" type="time" /></Field>
-              <Field label="Local"><Inp obj={edit} set={setEdit} k="local" /></Field>
+              <Field label="Usar endereço de uma filial" hint="Preenche o local e o endereço automaticamente">
+                <select
+                  value=""
+                  onChange={(ev) => {
+                    const f = db.filiais.find((x) => x.id === ev.target.value);
+                    if (f) setEdit({ ...edit, local: f.nome, endereco: enderecoFilial(f) });
+                  }}
+                >
+                  <option value="">Escolher filial…</option>
+                  {db.filiais.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              </Field>
+              <Field label="Local" hint="Nome do lugar (ex.: Ginásio Municipal) ou “Online”"><Inp obj={edit} set={setEdit} k="local" /></Field>
+              <Field label="Endereço completo" style={{ gridColumn: '1/-1' }} hint="Rua, número, bairro e cidade — abre no Google Maps para os alunos">
+                <Inp obj={edit} set={setEdit} k="endereco" placeholder="Ex.: R. Rio Grande do Sul, 172, Barueri - SP" />
+              </Field>
               <Field label="Link Google Meet"><Inp obj={edit} set={setEdit} k="meet" type="url" placeholder="https://meet.google.com/…" /></Field>
               <Field label="Descrição" style={{ gridColumn: '1/-1' }}><Inp obj={edit} set={setEdit} k="descricao" type="textarea" /></Field>
             </div>

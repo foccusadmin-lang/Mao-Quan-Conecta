@@ -2,6 +2,7 @@
 import { useDB, setDB } from '../../lib/db';
 import { brl, uid, waLink, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, useConfirm, toast, Empty } from '../../components/ui';
+import { LinkMapa, enderecoFilial } from '../../components/shared';
 
 const vazio = { nome: '', cidade: '', endereco: '', responsaveis: '', telefone: '', email: '', professorId: '', mensalidade: 120, aulasSemana: 2, minFrequencia: 75, maxFaltas: 6, ativa: true };
 
@@ -49,7 +50,7 @@ export default function Filiais() {
                 <span className="badge gold">{brl(f.mensalidade)}/mês</span>
               </div>
               <h3 style={{ marginTop: 10 }}>{f.nome}</h3>
-              <div className="small muted">📍 {f.endereco ? `${f.endereco} · ` : ''}{f.cidade}</div>
+              <div className="small muted">📍 <LinkMapa endereco={enderecoFilial(f)}>{f.endereco ? `${f.endereco} · ` : ''}{f.cidade}</LinkMapa></div>
               {f.responsaveis && <div className="small" style={{ marginTop: 4 }}>👥 {f.responsaveis}</div>}
               {(f.telefone || f.email) && (
                 <div className="row small" style={{ marginTop: 4, gap: 8 }}>

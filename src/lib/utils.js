@@ -147,3 +147,7 @@ export const addMonths = (iso, n) => {
 // para que sempre apontem para o domínio público (mesmo quando gerados em outro endereço).
 export const DOMINIO = 'https://maoquanconecta.com.br';
 export const APP_URL = (import.meta.env.VITE_APP_URL || (import.meta.env.PROD ? DOMINIO : location.origin + location.pathname)).replace(/\/+$/, '') + '/';
+
+// Google Maps: abre o endereço (no celular abre o app de mapas) e a rota até o local
+export const mapsBusca = (endereco) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+export const mapsRota = (endereco) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(endereco)}`;

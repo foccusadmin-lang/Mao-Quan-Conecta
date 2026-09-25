@@ -23,6 +23,7 @@ import Financeiro from './pages/shared/Financeiro';
 import Eventos from './pages/shared/Eventos';
 import Comunicados from './pages/shared/Comunicados';
 import Materiais from './pages/shared/Materiais';
+import OndeTreinar from './pages/shared/OndeTreinar';
 
 import ProfDashboard from './pages/professor/Dashboard';
 import Presenca from './pages/professor/Presenca';
@@ -117,6 +118,7 @@ export default function App() {
             {temRecurso(user, 'estudo') && <Route path="estudo" element={<Estudo user={user} />} />}
             {temRecurso(user, 'sede') && <Route path="sede" element={<Comunicados user={user} />} />}
             {temRecurso(user, 'eventos') && <Route path="eventos" element={<Eventos user={user} />} />}
+            <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
             {temRecurso(user, 'carteira') && <Route path="carteira" element={<ProfCarteira user={user} />} />}
             {temRecurso(user, 'filiacao') && <Route path="filiacao" element={<Filiacao user={user} />} />}
           </Route>
@@ -131,6 +133,7 @@ export default function App() {
               <Route path="presenca" element={<AlunoPresenca user={user} />} />
               <Route path="eventos" element={<Eventos user={user} />} />
               <Route path="atleta" element={<Atleta user={user} />} />
+              <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
               <Route path="institucional" element={<><PageHead title="Institucional" sub="Linhagem, história e o código de ética Wu De" /><Institucional /></>} />
               <Route path="diretoria" element={<><PageHead title="Diretoria 2025" sub="Diretores em atuação na vigência atual" /><DiretoriaList /></>} />
               <Route path="pagamentos" element={<Pagamentos user={user} />} />

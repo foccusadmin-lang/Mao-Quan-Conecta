@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useDB } from '../lib/db';
-import { pixPayload, copy, brl, waLink, b64e, todayISO, APP_URL } from '../lib/utils';
+import { pixPayload, copy, brl, waLink, b64e, todayISO, APP_URL, mapsBusca, mapsRota } from '../lib/utils';
 import { Modal, toast, WAIcon, Card } from './ui';
 
 export function useQR(text, opts = {}) {
@@ -204,5 +204,25 @@ export function Institucional() {
         ))}
       </Card>
     </div>
+  );
+}
+
+// ---------- Endereços clicáveis (Google Maps) ----------
+export const enderecoFilial = (f) => (f ? [f.endereco, f.cidade].filter(Boolean).join(', ') : '');
+
+/** Endereço completo do evento: o informado, o da filial com o mesmo nome do local ou o próprio local */
+export function enderecoEvento(db, e) {
+  if (e.endereco) return e.endereco;
+  const f = db.filiais.find((x) => x.nome === e.local);
+  if (f?.endereco) return enderecoFilial(f);
+  return /^online$/i.test((e.local || '').trim()) ? '' : e.local || '';
+}
+
+export function LinkMapa({ endereco, children, rota }) {
+  if (!endereco) return <span>{children}</span>;
+  return (
+    <a href={rota ? mapsRota(endereco) : mapsBusca(endereco)} target="_blank" rel="noreferrer" title="Abrir no Google Maps" style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}>
+      {children}
+    </a>
   );
 }
