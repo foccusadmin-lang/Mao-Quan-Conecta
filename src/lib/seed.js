@@ -89,7 +89,7 @@ export function seed() {
     presencas: [],
     materiais: [
       { id: uid('m'), titulo: 'Bases fundamentais (Ma Bu, Gong Bu, Pu Bu)', tipo: 'base', faixaIdx: 0, url: '', arquivo: null, descricao: 'Posturas básicas do estilo. Substitua pelo link do vídeo oficial.', publico: 'aluno', criadoEm: hoje },
-      { id: uid('m'), titulo: 'Taolu da Faixa Amarela', tipo: 'taolu', faixaIdx: 1, url: '', arquivo: null, descricao: 'Sequência oficial da faixa amarela.', publico: 'aluno', criadoEm: hoje },
+      { id: uid('m'), titulo: 'Taolu da Faixa Amarela', tipo: 'taolu', faixaIdx: 5, url: '', arquivo: null, descricao: 'Sequência oficial da faixa amarela.', publico: 'aluno', criadoEm: hoje },
       { id: uid('m'), titulo: 'Didática para Laoshi — Módulo 1', tipo: 'teoria', faixaIdx: 0, url: '', arquivo: null, descricao: 'Capacitação técnica para professores.', publico: 'professor', criadoEm: hoje },
     ],
     eventos: [
