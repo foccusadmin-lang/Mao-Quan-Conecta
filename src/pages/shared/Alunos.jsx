@@ -12,6 +12,7 @@ export default function Alunos({ user }) {
   const [q, setQ] = useState('');
   const [aberto, setAberto] = useState(null);
   const [novo, setNovo] = useState(null);
+  const [aprovar, setAprovar] = useState(null);
   const [ask, confirmEl] = useConfirm();
 
   const liberar = () => {
@@ -96,7 +97,7 @@ export default function Alunos({ user }) {
                       <td className="nowrap">
                         {a.status === 'pendente' && (
                           <>
-                            <button className="btn sm ok" onClick={() => setStatus(a, 'aprovado')}>Aprovar</button>{' '}
+                            <button className="btn sm ok" onClick={() => (podeCorrigirGraduacao(db, user, a) ? setAprovar({ id: a.id, nome: a.nome, faixaIdx: a.faixaIdx }) : setStatus(a, 'aprovado'))}>Aprovar</button>{' '}
                             <button className="btn sm ghost" onClick={() => ask(`Recusar o cadastro de ${a.nome}?`, () => setStatus(a, 'recusado'), 'Recusar')}>Recusar</button>{' '}
                           </>
                         )}
@@ -111,6 +112,37 @@ export default function Alunos({ user }) {
         )}
       </Card>
       {aberto && <AlunoModal id={aberto} user={user} onClose={() => setAberto(null)} ask={ask} />}
+      <Modal
+        open={!!aprovar}
+        onClose={() => setAprovar(null)}
+        title={`Aprovar cadastro — ${aprovar?.nome || ''}`}
+        footer={
+          <button
+            className="btn ok"
+            onClick={() => {
+              const alvo = db.alunos.find((x) => x.id === aprovar.id);
+              setStatus(alvo, 'aprovado');
+              setDB((d) => corrigirGraduacao(d, aprovar.id, aprovar.faixaIdx, user));
+              setAprovar(null);
+              toast('Cadastro aprovado.');
+            }}
+          >
+            Aprovar cadastro
+          </button>
+        }
+      >
+        {aprovar && (
+          <div className="col">
+            <div className="alert gold small">
+              <div>Todo cadastro novo começa na primeira faixa. Se o aluno <b>já é graduado</b>, selecione abaixo a faixa real dele antes de aprovar.</div>
+            </div>
+            <Field label="Graduação do aluno">
+              <select value={aprovar.faixaIdx} onChange={(e) => setAprovar({ ...aprovar, faixaIdx: +e.target.value })}><FaixaOptions /></select>
+            </Field>
+            <Faixa idx={aprovar.faixaIdx} />
+          </div>
+        )}
+      </Modal>
       <Modal open={!!novo} onClose={() => setNovo(null)} title="Liberar acesso de aluno" footer={<button className="btn" onClick={liberar}>Liberar acesso</button>}>
         {novo && (
           <div className="col">
@@ -143,6 +175,22 @@ export default function Alunos({ user }) {
   );
 }
 
+/** Central ou professor da filial do aluno (vinculado ou responsável) podem corrigir a graduação */
+const podeCorrigirGraduacao = (db, user, a) =>
+  user.role === 'admin' || (user.role === 'professor' && !!a.filialId && (user.filialId === a.filialId || db.filiais.find((x) => x.id === a.filialId)?.professorId === user.id));
+
+/** Ajusta a faixa do aluno registrando no histórico e avisando aluno e Central */
+function corrigirGraduacao(d, alunoId, faixaIdx, user) {
+  const x = d.alunos.find((y) => y.id === alunoId);
+  if (!x || x.faixaIdx === faixaIdx) return;
+  const antes = x.faixaIdx;
+  x.faixaIdx = faixaIdx;
+  x.historicoGraduacao = [...(x.historicoGraduacao || []), { data: todayISO(), faixaIdx, de: antes, por: user.nome, manual: true }];
+  x.inscritoExame = false;
+  notify(d, alunoId, 'Graduação atualizada 🎖️', `Sua graduação foi ajustada para ${faixaNome(d, faixaIdx)}.`);
+  if (user.role !== 'admin') notify(d, 'admin', 'Graduação corrigida pelo professor', `${x.nome}: ${faixaNome(d, antes)} → ${faixaNome(d, faixaIdx)} (por ${user.titulo || ''} ${user.nome}, ${filialNome(d, x.filialId)}).`);
+}
+
 function AlunoModal({ id, user, onClose, ask }) {
   const db = useDB();
   const a = db.alunos.find((x) => x.id === id);
@@ -152,8 +200,7 @@ function AlunoModal({ id, user, onClose, ask }) {
   const [promo, setPromo] = useState(null);
   const isAdmin = user.role === 'admin';
   if (!a) return null;
-  // Graduação manual: Central ou o professor responsável pela filial do aluno
-  const podeGraduar = isAdmin || (user.role === 'professor' && db.filiais.find((x) => x.id === a.filialId)?.professorId === user.id);
+  const podeGraduar = podeCorrigirGraduacao(db, user, a);
   const fin = situacaoAluno(db, a);
   const fr = frequencia(db, a);
 
@@ -161,22 +208,15 @@ function AlunoModal({ id, user, onClose, ask }) {
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === id);
       const antes = x.atleta?.ativo;
-      const faixaAntes = x.faixaIdx;
-      const novaFaixa = podeGraduar ? f.faixaIdx : faixaAntes;
-      Object.assign(x, { ...f, faixaIdx: novaFaixa, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao });
-      if (novaFaixa !== faixaAntes) {
-        x.historicoGraduacao = [...(x.historicoGraduacao || []), { data: todayISO(), faixaIdx: novaFaixa, de: faixaAntes, por: user.nome, manual: true }];
-        x.inscritoExame = false;
-        notify(d, id, 'Graduação atualizada 🎖️', `Sua graduação agora é ${faixaNome(d, novaFaixa)}.`);
-        if (!isAdmin) notify(d, 'admin', 'Graduação alterada pelo professor', `${x.nome}: ${faixaNome(d, faixaAntes)} → ${faixaNome(d, novaFaixa)} (por ${user.titulo || ''} ${user.nome}, ${filialNome(d, x.filialId)}).`);
-      }
+      Object.assign(x, { ...f, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame });
+      if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
       if (!antes && f.atleta?.ativo) notify(d, id, 'Você foi convocado(a) como Atleta 🏆', `Polo: ${f.atleta.polo || '—'}. Acesse a aba Atleta e assine o termo.`);
     });
     toast('Aluno salvo.');
   };
   const salvar = () =>
     podeGraduar && f.faixaIdx !== a.faixaIdx
-      ? ask(`Alterar a graduação de ${a.nome} de ${faixaNome(db, a.faixaIdx)} para ${faixaNome(db, f.faixaIdx)}? A alteração fica registrada no histórico.`, gravar, 'Alterar graduação')
+      ? ask(`Corrigir a graduação de ${a.nome} de ${faixaNome(db, a.faixaIdx)} para ${faixaNome(db, f.faixaIdx)}? A alteração fica registrada no histórico.`, gravar, 'Corrigir graduação')
       : gravar();
   const addNota = () => {
     if (!nota.obs.trim()) return toast('Escreva uma observação.');
@@ -221,7 +261,7 @@ function AlunoModal({ id, user, onClose, ask }) {
                 </select>
               </Field>
             )}
-            <Field label="Graduação atual" hint={isAdmin ? '' : podeGraduar ? 'Alteração manual — fica registrada no histórico do aluno' : 'Somente o professor responsável pela filial ou a Central pode alterar'}>
+            <Field label="Graduação atual" hint={isAdmin ? '' : podeGraduar ? 'Corrija aqui a faixa real do aluno — fica registrado no histórico' : 'Somente os professores da filial do aluno ou a Central podem alterar'}>
               <select value={f.faixaIdx} disabled={!podeGraduar} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
                 <FaixaOptions />
               </select>
