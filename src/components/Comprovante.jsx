@@ -9,7 +9,7 @@ const TIPOS_OK = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/
 const dataHora = (iso) => (iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—');
 
 /** Sobe o arquivo para o armazenamento privado e registra no pagamento (fica "em conferência") */
-export async function enviarComprovante(pagamento, arquivo) {
+export async function enviarComprovante(pagamento, arquivo, extra = {}) {
   if (!TIPOS_OK.includes(arquivo.type)) throw new Error('Envie uma foto (JPG, PNG) ou PDF do comprovante.');
   let f = arquivo;
   if (arquivo.type.startsWith('image/') && !/hei[cf]/.test(arquivo.type)) f = await comprimirImagem(arquivo, 1800, 0.85);
@@ -18,7 +18,7 @@ export async function enviarComprovante(pagamento, arquivo) {
   const caminho = `${pagamento.id}/${uid('c')}.${ext}`;
   const { error: e1 } = await supabase.storage.from('comprovantes').upload(caminho, f, { contentType: f.type, upsert: false });
   if (e1) throw e1;
-  const { data, error: e2 } = await supabase.rpc('mq_registrar_comprovante', { p_pagamento: pagamento.id, p_arquivo: { caminho, nome: arquivo.name, tipo: f.type, tamanho: f.size } });
+  const { data, error: e2 } = await supabase.rpc('mq_registrar_comprovante', { p_pagamento: pagamento.id, p_arquivo: { caminho, nome: arquivo.name, tipo: f.type, tamanho: f.size, ...extra } });
   if (e2) throw e2;
   aplicarDoServidor('pagamentos', pagamento.id, data);
   return data;
@@ -43,7 +43,7 @@ export function SeloComprovante({ p }) {
 }
 
 /** Bloco de envio de comprovante — aparece em toda tela que pede pagamento */
-export function EnviarComprovante({ pagamentoId }) {
+export function EnviarComprovante({ pagamentoId, parte, divisao }) {
   const db = useDB();
   const p = db.pagamentos.find((x) => x.id === pagamentoId);
   const input = useRef(null);
@@ -57,8 +57,8 @@ export function EnviarComprovante({ pagamentoId }) {
     if (!arq) return;
     setEnviando(true);
     try {
-      await enviarComprovante(p, arq);
-      toast('Comprovante enviado! A Central e o professor responsável vão conferir.');
+      await enviarComprovante(p, arq, parte ? { parte: parte.professorId, parteNome: parte.nome, parteValor: parte.valor, divisao } : {});
+      toast(parte ? `Comprovante da parte de ${parte.nome} enviado!` : 'Comprovante enviado! A Central e o professor responsável vão conferir.');
     } catch (err) {
       toast('Não foi possível enviar: ' + err.message);
     } finally {
@@ -66,11 +66,14 @@ export function EnviarComprovante({ pagamentoId }) {
     }
   };
 
-  const ultimo = p.comprovantes?.at(-1);
+  const ultimo = (p.comprovantes || []).filter((c) => !parte || c.parte === parte.professorId).at(-1);
   return (
     <div className="card" style={{ width: '100%', background: '#faf8f6', textAlign: 'left' }}>
-      <b className="small">📎 Comprovante de pagamento</b>
-      {p.analise === 'enviado' && ultimo && (
+      <b className="small">📎 Comprovante{parte ? ` — parte de ${parte.nome}` : ' de pagamento'}</b>
+      {parte && ultimo && p.analise !== 'recusado' && (
+        <div className="alert gold small" style={{ margin: '8px 0' }}>⏳ Enviado em {dataHora(ultimo.enviadoEm)} — aguardando conferência.</div>
+      )}
+      {!parte && p.analise === 'enviado' && ultimo && (
         <div className="alert gold small" style={{ margin: '8px 0' }}>⏳ Enviado em {dataHora(ultimo.enviadoEm)} — aguardando conferência.</div>
       )}
       {p.analise === 'recusado' && (
@@ -79,7 +82,7 @@ export function EnviarComprovante({ pagamentoId }) {
       {!p.analise && <p className="xs muted" style={{ margin: '4px 0 8px' }}>Depois de pagar, envie a foto ou o PDF do comprovante para conferência.</p>}
       <input ref={input} type="file" accept="image/*,application/pdf" onChange={escolher} hidden />
       <button type="button" className="btn ok sm block" disabled={enviando} onClick={() => input.current?.click()}>
-        {enviando ? 'Enviando…' : p.analise === 'enviado' ? '📎 Enviar outro comprovante' : '📎 Enviar comprovante'}
+        {enviando ? 'Enviando…' : ultimo && p.analise === 'enviado' ? '📎 Enviar outro comprovante' : '📎 Enviar comprovante'}
       </button>
     </div>
   );
@@ -95,6 +98,7 @@ function ArquivoComprovante({ c }) {
   return (
     <div className="card" style={{ padding: 10 }}>
       <div className="xs muted">
+        {c.parteNome && <b style={{ color: 'var(--ink)' }}>Parte de {c.parteNome}{c.parteValor != null ? ` (${brl(c.parteValor)})` : ''} · </b>}
         Enviado por <b>{c.enviadoPor}</b> ({c.papel === 'pagador' ? 'pagador' : c.papel === 'admin' ? 'Central' : 'professor'}) em {dataHora(c.enviadoEm)} · {c.nome}
       </div>
       {erro && <div className="xs" style={{ color: 'var(--red)' }}>Não foi possível abrir: {erro}</div>}
@@ -144,6 +148,22 @@ export function ConferenciaPagamento({ pagamentoId, user, nomePessoa, onFeito, p
           </div>
         </div>
       </div>
+
+      {p.divisao?.length > 1 && (
+        <div className="card" style={{ padding: 12 }}>
+          <b className="small">➗ Mensalidade dividida entre {p.divisao.length} professores</b>
+          {p.divisao.map((d) => {
+            const tem = (p.comprovantes || []).some((c) => c.parte === d.professorId);
+            return (
+              <div key={d.professorId} className="list-item small">
+                <div className="grow">{d.nome}</div>
+                {d.valor != null && <b>{brl(d.valor)}</b>}
+                {tem ? <span className="badge ok">📎 comprovante enviado</span> : <span className="badge red">sem comprovante</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <b className="small">📎 Comprovantes ({p.comprovantes?.length || 0})</b>
       {!p.comprovantes?.length && <p className="small muted" style={{ margin: 0 }}>Nenhum comprovante enviado.</p>}

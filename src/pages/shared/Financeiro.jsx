@@ -2,7 +2,7 @@
 import { useDB, setDB, notify, confirmarPagamento, rotinaFinanceira, situacaoAluno, filialNome, professorEmDia, gerarFiliacao, planoFiliacao, descPlano } from '../../lib/db';
 import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays, maskChavePix } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Search, useConfirm } from '../../components/ui';
-import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
+import { PixBox, useRecebedores, recebedoresLocal, dividirValor } from '../../components/shared';
 import { PlanosFilialEditor } from '../../components/Planos';
 import { ConferenciaPagamento, SeloComprovante } from '../../components/Comprovante';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
@@ -22,7 +22,7 @@ export default function Financeiro({ user }) {
   const [retro, setRetro] = useState(false);
   const [ask, confirmEl] = useConfirm();
   const hoje = todayISO();
-  const { rec: recMinhaFilial } = useRecebedor(isAdmin ? null : user.filialId);
+  const { lista: recMinhaFilial } = useRecebedores(isAdmin ? null : user.filialId);
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial.</Empty>;
 
@@ -43,7 +43,12 @@ export default function Financeiro({ user }) {
     });
 
   const chaveLembrete = (p) => {
-    const rec = p.tipo === 'mensalidade' ? (isAdmin ? recebedorLocal(db, p.filialId) : recMinhaFilial) : null;
+    const lista = p.tipo === 'mensalidade' ? (isAdmin ? recebedoresLocal(db, p.filialId) || [] : recMinhaFilial) : [];
+    if (lista.length > 1) {
+      const partes = dividirValor(p.valor, lista.length);
+      return 'um PIX para cada professor — ' + lista.map((r, i) => `${r.titular || r.nome}: ${maskChavePix(r.tipo, r.chave)} (${brl(partes[i])})`).join('; ');
+    }
+    const rec = lista[0];
     return rec ? `${maskChavePix(rec.tipo, rec.chave)} (${rec.titular || rec.nome})` : db.config.pixChave;
   };
 
@@ -88,7 +93,7 @@ export default function Financeiro({ user }) {
         const linhas = db.filiais.filter((f) => !filial || f.id === filial).map((f) => {
           const pg = db.pagamentos.filter((p) => p.filialId === f.id);
           const mens = pg.filter((p) => p.tipo === 'mensalidade');
-          const rec = recebedorLocal(db, f.id);
+          const recs = recebedoresLocal(db, f.id) || [];
           return {
             f,
             alunos: db.alunos.filter((a) => a.status === 'aprovado' && a.filialId === f.id).length,
@@ -97,7 +102,7 @@ export default function Financeiro({ user }) {
             recebidoOutros: soma(pg.filter((p) => p.tipo !== 'mensalidade' && p.status === 'pago' && p.pagoEm?.startsWith(mes))),
             aberto: soma(pg.filter((p) => p.status === 'pendente')),
             vencido: soma(pg.filter((p) => p.status === 'pendente' && p.vencimento < hoje)),
-            recebedor: rec ? `${rec.titulo || 'Laoshi'} ${rec.nome}` : null,
+            recebedores: recs.map((r) => `${r.titulo || 'Laoshi'} ${r.nome}`),
           };
         });
         const tot = ['alunos', 'previsto', 'recebidoMens', 'recebidoOutros', 'aberto', 'vencido'].reduce((o, k) => ({ ...o, [k]: linhas.reduce((s, l) => s + l[k], 0) }), {});
@@ -122,7 +127,7 @@ export default function Financeiro({ user }) {
                       <td className="nowrap">{brl(l.recebidoOutros)}</td>
                       <td className="nowrap">{brl(l.aberto)}</td>
                       <td className="nowrap" style={{ color: l.vencido ? 'var(--red)' : undefined }}>{brl(l.vencido)}</td>
-                      <td className="small">{l.recebedor ? <span className="badge ok">{l.recebedor}</span> : <span className="badge">Associação</span>}</td>
+                      <td className="small">{l.recebedores.length ? <>{l.recebedores.map((n) => <span key={n} className="badge ok" style={{ margin: '0 4px 4px 0' }}>{n}</span>)}{l.recebedores.length > 1 && <div className="xs muted">dividida em {l.recebedores.length} partes iguais</div>}</> : <span className="badge">Associação</span>}</td>
                       <td>{!filial && <button className="btn sm ghost" onClick={() => setFilial(l.f.id)}>Detalhar</button>}</td>
                     </tr>
                   ))}
@@ -137,7 +142,7 @@ export default function Financeiro({ user }) {
               </table>
             </div>
             {filial && <button className="btn sm ghost mt" onClick={() => setFilial('')}>← Ver todas as filiais</button>}
-            <p className="xs muted" style={{ marginBottom: 0 }}>Mensalidades são creditadas na chave PIX do professor responsável pela filial; sem chave cadastrada, vão para a Associação. Filiação e demais taxas vão sempre para a Associação.</p>
+            <p className="xs muted" style={{ marginBottom: 0 }}>Mensalidades são creditadas na chave PIX dos professores responsáveis pela filial — com 2 ou mais, o valor é dividido igualmente (um PIX para cada); sem chave cadastrada, vão para a Associação. Filiação e demais taxas vão sempre para a Associação.</p>
           </Card>
         );
       })()}
