@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { useDB, setDB, notify, confirmarPagamento, rotinaFinanceira, situacaoAluno, filialNome, professorEmDia, gerarFiliacao, planoFiliacao, descPlano } from '../../lib/db';
+import { useDB, setDB, notify, confirmarPagamento, rotinaFinanceira, situacaoAluno, filialNome, professorEmDia, gerarFiliacao, planoFiliacao, descPlano, divisaoFiliacao } from '../../lib/db';
 import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays, maskChavePix } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Search, useConfirm } from '../../components/ui';
 import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
@@ -256,7 +256,7 @@ export default function Financeiro({ user }) {
                     ) : (
                       <select defaultValue="" style={{ maxWidth: 240 }} onChange={(e) => { const id = e.target.value; e.target.value = ''; if (id) setDB((d) => { if (gerarFiliacao(d, p.id, id)) toast('Cobrança de filiação gerada.'); }); }}>
                         <option value="">Gerar cobrança…</option>
-                        {db.config.planosFiliacao.map((x) => <option key={x.id} value={x.id}>{descPlano(x)}</option>)}
+                        {db.config.planosFiliacao.map((x) => { const dv = divisaoFiliacao(db, p, x); return <option key={x.id} value={x.id}>{x.parcelas === 1 ? `${x.nome} — ${brl(dv.total)}` : `${x.nome} — ${x.parcelas}x de ${brl(dv.valorParcela)}`}{dv.n > 1 ? ` (÷${dv.n} responsáveis)` : ""}</option>; })}
                       </select>
                     )}
                   </>

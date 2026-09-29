@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useDB, setDB, professorEmDia, gerarFiliacao, planoFiliacao } from '../../lib/db';
+import { useDB, setDB, professorEmDia, gerarFiliacao, planoFiliacao, divisaoFiliacao } from '../../lib/db';
 import { brl, fmtDate, todayISO } from '../../lib/utils';
 import { PageHead, Card, Modal, StatusBadge, toast, useConfirm } from '../../components/ui';
 import { SeloComprovante } from '../../components/Comprovante';
@@ -19,17 +19,23 @@ export default function Filiacao({ user }) {
   const historico = [...minhas].sort((a, b) => b.vencimento.localeCompare(a.vencimento));
   const planoAtual = planoFiliacao(db, user.planoFiliacao);
 
-  const escolher = (pl) =>
-    ask(
-      pl.parcelas === 1
-        ? `Gerar a filiação anual à vista de ${brl(pl.valorParcela)}?`
-        : `Gerar a filiação anual em ${pl.parcelas} parcelas mensais de ${brl(pl.valorParcela)}? As parcelas são cobradas automaticamente todo mês.`,
+  const eu = db.professores.find((x) => x.id === user.id) || user;
+  const dividida = c.planosFiliacao.length ? divisaoFiliacao(db, eu, c.planosFiliacao[0]) : { n: 1 };
+
+  const escolher = (pl) => {
+    const dv = divisaoFiliacao(db, eu, pl);
+    return ask(
+      (pl.parcelas === 1
+        ? `Gerar a filiação anual à vista de ${brl(dv.total)}?`
+        : `Gerar a filiação anual em ${pl.parcelas} parcelas mensais de ${brl(dv.valorParcela)}? As parcelas são cobradas automaticamente todo mês.`) +
+        (dv.n > 1 ? ` (Sua parte: o valor de ${brl(dv.totalPlano)} é dividido entre os ${dv.n} professores responsáveis da filial.)` : ''),
       () => {
         setDB((d) => void gerarFiliacao(d, user.id, pl.id));
         toast('Cobrança gerada. Pague a 1ª parcela via PIX e envie o comprovante.');
       },
       'Gerar cobrança'
     );
+  };
 
   return (
     <>
@@ -41,17 +47,29 @@ export default function Filiacao({ user }) {
         </div>
       </div>
 
+      {dividida.n > 1 && (
+        <div className="alert gold mb">
+          <div>
+            👥 <b>{dividida.filial}</b> tem <b>{dividida.n} professores responsáveis</b>: o valor da filiação é dividido entre vocês. Os preços abaixo já são <b>a sua parte</b> (1/{dividida.n} do valor do plano).
+          </div>
+        </div>
+      )}
+
       <div className="grid g3">
-        {c.planosFiliacao.map((pl) => (
+        {c.planosFiliacao.map((pl) => {
+          const dv = divisaoFiliacao(db, eu, pl);
+          return (
           <Card key={pl.id} className="pad-lg" style={pl.id === 'avista' ? { borderColor: 'var(--red)', borderWidth: 2 } : {}}>
             <span className={`badge ${pl.id === 'avista' ? 'red' : ''}`}>{TAG[pl.id] || 'Plano'}</span>
             {user.planoFiliacao === pl.id && <span className="badge ok" style={{ marginLeft: 6 }}>Seu plano</span>}
             <h3 style={{ marginTop: 10 }}>{pl.nome}</h3>
             <div style={{ fontSize: 30, fontWeight: 800 }}>
               {pl.parcelas > 1 && <span className="small muted">{pl.parcelas}x </span>}
-              {brl(pl.valorParcela)}
+              {brl(dv.valorParcela)}
             </div>
-            <div className="small muted">Total anual: {brl(pl.parcelas * pl.valorParcela)}</div>
+            <div className="small muted">
+              {dv.n > 1 ? <>Sua parte no ano: <b>{brl(dv.total)}</b> · valor do plano {brl(dv.totalPlano)} ÷ {dv.n}</> : <>Total anual: {brl(dv.total)}</>}
+            </div>
             <ul className="small" style={{ paddingLeft: 18 }}>
               <li>🏅 Placa personalizada de filial</li>
               <li>📜 Certificado de alvará de funcionamento</li>
@@ -63,7 +81,8 @@ export default function Filiacao({ user }) {
               Escolher {pl.parcelas === 1 ? 'à vista' : `${pl.parcelas}x`}
             </button>
           </Card>
-        ))}
+          );
+        })}
       </div>
       {abertas.length > 0 && <p className="xs muted">Para trocar de plano, conclua ou peça à Central o cancelamento das parcelas em aberto.</p>}
 

@@ -542,24 +542,42 @@ export const planoFiliacao = (db, id) => db.config.planosFiliacao?.find((p) => p
 export const descPlano = (pl) => (pl.parcelas === 1 ? `${pl.nome} — ${brl(pl.valorParcela)}` : `${pl.nome} — ${pl.parcelas}x de ${brl(pl.valorParcela)}`);
 
 /** Gera todas as parcelas de um ciclo anual de filiação (vencimentos mensais) */
+/**
+ * Filiação dividida entre os professores responsáveis da mesma filial:
+ * cada um paga total ÷ nº de responsáveis (ex.: R$ 300 → R$ 150 para 2, R$ 100 para 3).
+ */
+export function divisaoFiliacao(db, prof, pl) {
+  const f = prof && db.filiais.find((x) => x.id === prof.filialId);
+  const n = f && ehResponsavel(f, prof.id) ? Math.max(1, responsaveisFilial(f).length) : 1;
+  const totalCentavos = Math.round(pl.parcelas * pl.valorParcela * 100);
+  const minhaParte = Math.round(totalCentavos / n); // centavos
+  const base = Math.floor(minhaParte / pl.parcelas);
+  const parcelas = Array.from({ length: pl.parcelas }, (_, i) => (i === pl.parcelas - 1 ? minhaParte - base * (pl.parcelas - 1) : base) / 100);
+  return { n, total: minhaParte / 100, totalPlano: totalCentavos / 100, parcelas, valorParcela: parcelas[0], filial: f?.nome };
+}
+
 export function gerarFiliacao(db, profId, planoId, inicio = todayISO()) {
   const prof = db.professores.find((x) => x.id === profId);
   const pl = planoFiliacao(db, planoId);
   if (!prof || !pl) return false;
+  const dv = divisaoFiliacao(db, prof, pl);
   const ciclo = uid('ci');
   const primeiro = addDays(inicio, 3);
+  const sufixo = dv.n > 1 ? ` (dividida entre ${dv.n} professores)` : '';
   for (let i = 0; i < pl.parcelas; i++) {
     db.pagamentos.push({
       id: uid('pg'), tipo: 'filiacao', plano: pl.id, ciclo, parcela: i + 1, parcelas: pl.parcelas, meses: 12 / pl.parcelas,
       pessoaId: prof.id, filialId: prof.filialId, competencia: addMonths(primeiro, i).slice(0, 7),
-      descricao: pl.parcelas === 1 ? 'Filiação anual (à vista)' : `Filiação anual — parcela ${i + 1}/${pl.parcelas}`,
-      valor: pl.valorParcela, vencimento: addMonths(primeiro, i), status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
+      descricao: (pl.parcelas === 1 ? 'Filiação anual (à vista)' : `Filiação anual — parcela ${i + 1}/${pl.parcelas}`) + sufixo,
+      valor: dv.parcelas[i], ...(dv.n > 1 ? { divisaoFiliacao: { professores: dv.n, totalPlano: dv.totalPlano } } : {}),
+      vencimento: addMonths(primeiro, i), status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
     });
   }
   prof.planoFiliacao = pl.id;
   if (prof.renovacaoAutomatica === undefined) prof.renovacaoAutomatica = true;
-  notify(db, prof.id, 'Cobrança de filiação gerada', descPlano(pl));
-  notify(db, 'admin', 'Filiação de professor gerada', `${prof.nome}: ${descPlano(pl)}`);
+  const resumo = pl.parcelas === 1 ? `${pl.nome} — ${brl(dv.total)}` : `${pl.nome} — ${pl.parcelas}x de ${brl(dv.valorParcela)}`;
+  notify(db, prof.id, 'Cobrança de filiação gerada', resumo + sufixo);
+  notify(db, 'admin', 'Filiação de professor gerada', `${prof.nome}: ${resumo}${sufixo}`);
   return true;
 }
 
