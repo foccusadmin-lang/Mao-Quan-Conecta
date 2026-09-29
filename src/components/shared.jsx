@@ -4,6 +4,7 @@ import { useDB } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { pixPayload, chavePixEMV, maskChavePix, TIPOS_PIX, copy, brl, waLink, b64e, todayISO, APP_URL, mapsBusca, mapsRota } from '../lib/utils';
 import { Modal, toast, WAIcon, Card } from './ui';
+import { EnviarComprovante } from './Comprovante';
 
 export function useQR(text, opts = {}) {
   const [url, setUrl] = useState(null);
@@ -88,9 +89,18 @@ export function PixBox({ valor, descricao, txid, filialId }) {
       {!rec && db.config.infinitePay && (
         <a className="btn gold sm" href={db.config.infinitePay} target="_blank" rel="noreferrer">💳 Pagar com cartão (InfinitePay)</a>
       )}
-      <a className="btn ok sm" href={waLink(whats, `Olá! Segue o comprovante de pagamento: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">
-        📎 Enviar comprovante via WhatsApp{telProf.length >= 10 ? ' ao professor' : ''}
-      </a>
+      {txid && db.pagamentos.some((x) => x.id === txid) ? (
+        <>
+          <EnviarComprovante pagamentoId={txid} />
+          <a className="xs" href={waLink(whats, `Olá! Enviei o comprovante pelo app: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">
+            Dúvidas? Falar no WhatsApp{telProf.length >= 10 ? ' com o professor' : ''}
+          </a>
+        </>
+      ) : (
+        <a className="btn ok sm" href={waLink(whats, `Olá! Segue o comprovante de pagamento: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">
+          📎 Enviar comprovante via WhatsApp{telProf.length >= 10 ? ' ao professor' : ''}
+        </a>
+      )}
     </div>
   );
 }

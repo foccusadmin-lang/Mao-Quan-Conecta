@@ -4,6 +4,7 @@ import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays, maskC
 import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Search, useConfirm } from '../../components/ui';
 import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
 import { PlanosFilialEditor } from '../../components/Planos';
+import { ConferenciaPagamento, SeloComprovante } from '../../components/Comprovante';
 
 const TIPO = { mensalidade: 'Mensalidade', filiacao: 'Filiação', exame: 'Taxa de exame', manutencao: 'Manutenção', outro: 'Outro' };
 
@@ -16,6 +17,7 @@ export default function Financeiro({ user }) {
   const [filial, setFilial] = useState(isAdmin ? '' : user.filialId);
   const [novo, setNovo] = useState(null);
   const [pix, setPix] = useState(null);
+  const [conferir, setConferir] = useState(null);
   const [ask, confirmEl] = useConfirm();
   const hoje = todayISO();
   const { rec: recMinhaFilial } = useRecebedor(isAdmin ? null : user.filialId);
@@ -28,6 +30,7 @@ export default function Financeiro({ user }) {
   const busca = (p) => nomeDe(p.pessoaId).toLowerCase().includes(q.toLowerCase());
 
   const abertos = escopo.filter((p) => p.status === 'pendente' && busca(p)).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
+  const emConferencia = abertos.filter((p) => p.analise === 'enviado');
   const pagosMes = escopo.filter((p) => p.status === 'pago' && p.pagoEm?.startsWith(mes) && busca(p));
   const vencidos = abertos.filter((p) => p.vencimento < hoje);
 
@@ -72,7 +75,7 @@ export default function Financeiro({ user }) {
       </div>
 
       <Tabs
-        tabs={[...(isAdmin ? [['resumo', 'Resumo por filial']] : []), ['abertos', `Em aberto (${abertos.length})`], ['pagos', 'Recebidos'], ['isencoes', 'Isenções'], ['planos', '📋 Planos e valores'], ...(isAdmin ? [['professores', 'Filiação professores'], ['pix', 'PIX / QR Code']] : [])]}
+        tabs={[...(isAdmin ? [['resumo', 'Resumo por filial']] : []), ['conferencia', `🔎 Conferência (${emConferencia.length})`], ['abertos', `Em aberto (${abertos.length})`], ['pagos', 'Recebidos'], ['isencoes', 'Isenções'], ['planos', '📋 Planos e valores'], ...(isAdmin ? [['professores', 'Filiação professores'], ['pix', 'PIX / QR Code']] : [])]}
         value={tab}
         onChange={setTab}
       />
@@ -136,6 +139,21 @@ export default function Financeiro({ user }) {
         );
       })()}
 
+      {tab === 'conferencia' && (
+        <Card title="🔎 Comprovantes aguardando conferência">
+          {emConferencia.length === 0 ? <Empty icon="✅">Nenhum comprovante aguardando conferência.</Empty> : emConferencia.map((p) => (
+            <div key={p.id} className="list-item" style={{ flexWrap: 'wrap' }}>
+              <div className="grow">
+                <div style={{ fontWeight: 600 }}>{nomeDe(p.pessoaId)}</div>
+                <div className="xs muted">{p.descricao} · {filialNome(db, p.filialId)} · enviado em {new Date(p.comprovantes?.at(-1)?.enviadoEm).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</div>
+              </div>
+              <b>{brl(p.valor)}</b>
+              <button className="btn sm ok" onClick={() => setConferir(p.id)}>🔎 Conferir</button>
+            </div>
+          ))}
+        </Card>
+      )}
+
       {tab === 'abertos' && (
         <Card>
           {abertos.length === 0 ? <Empty icon="✅">Nenhuma cobrança em aberto.</Empty> : (
@@ -149,8 +167,9 @@ export default function Financeiro({ user }) {
                       <td>{p.descricao}<div className="xs muted">{TIPO[p.tipo]}</div></td>
                       <td>{fmtDate(p.vencimento)}</td>
                       <td className="nowrap">{brl(p.valor)}</td>
-                      <td><StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /></td>
+                      <td><StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} /></td>
                       <td className="nowrap">
+                        <button className={`btn sm ${p.analise === 'enviado' ? 'ok' : 'ghost'}`} title="Conferir comprovante e auditoria" onClick={() => setConferir(p.id)}>🔎 Conferir</button>{' '}
                         <button className="btn sm ok" onClick={() => confirmar(p, 'pix')}>✔ Confirmar</button>{' '}
                         <button className="btn sm ghost" title="Recebido em mãos" onClick={() => confirmar(p, 'dinheiro')}>💵</button>{' '}
                         <button className="btn sm ghost" title="Lembrete WhatsApp" onClick={() => lembrete(p)}>📲</button>{' '}
@@ -171,7 +190,7 @@ export default function Financeiro({ user }) {
           {pagosMes.length === 0 ? <Empty icon="🧾">Nenhum recebimento neste mês.</Empty> : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Pessoa</th><th>Descrição</th><th>Pago em</th><th>Método</th><th>Valor</th><th>Confirmado por</th></tr></thead>
+                <thead><tr><th>Pessoa</th><th>Descrição</th><th>Pago em</th><th>Método</th><th>Valor</th><th>Confirmado por</th><th>Comprovante</th></tr></thead>
                 <tbody>
                   {pagosMes.map((p) => (
                     <tr key={p.id}>
@@ -181,6 +200,7 @@ export default function Financeiro({ user }) {
                       <td>{p.metodo === 'dinheiro' ? 'Em mãos' : p.metodo?.toUpperCase()}</td>
                       <td>{brl(p.valor)}</td>
                       <td className="small">{p.confirmadoPor}</td>
+                      <td className="nowrap"><button className="btn sm ghost" onClick={() => setConferir(p.id)}>{p.comprovantes?.length ? `📎 ${p.comprovantes.length}` : '🧾'} Auditoria</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -259,6 +279,20 @@ export default function Financeiro({ user }) {
           </Card>
         </div>
       )}
+
+      <Modal open={!!conferir} onClose={() => setConferir(null)} title="Conferência e auditoria do pagamento" wide>
+        {conferir && (() => {
+          const p = db.pagamentos.find((x) => x.id === conferir);
+          // Ninguém confere o próprio pagamento (o professor-praticante é conferido por outro professor ou pela Central)
+          const proprio = p && [user.id, db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase())?.id].includes(p.pessoaId);
+          return (
+            <>
+              {proprio && !isAdmin && <div className="alert gold small mb">Este pagamento é seu — a conferência deve ser feita por outro professor da filial ou pela Central.</div>}
+              <ConferenciaPagamento pagamentoId={conferir} user={user} nomePessoa={nomeDe(p?.pessoaId)} podeDecidir={isAdmin || !proprio} onFeito={() => setConferir(null)} />
+            </>
+          );
+        })()}
+      </Modal>
 
       <Modal open={!!pix} onClose={() => setPix(null)} title="Cobrança PIX">
         {pix && <PixBox valor={pix.valor} descricao={pix.descricao} txid={pix.id} filialId={pix.tipo === 'mensalidade' ? pix.filialId : undefined} />}

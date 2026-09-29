@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { brl, fmtDate, todayISO, uid } from '../../lib/utils';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 import { PageHead, Card, Modal, StatusBadge, Empty, toast } from '../../components/ui';
+import { SeloComprovante } from '../../components/Comprovante';
 import { PixBox } from '../../components/shared';
 import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
 
@@ -114,7 +115,7 @@ export default function ProfMeuPlano({ user }) {
           <div key={p.id} className="list-item" style={{ flexWrap: 'wrap' }}>
             <div className="grow"><div style={{ fontWeight: 600 }}>{p.descricao}</div><div className="xs muted">Vencimento {fmtDate(p.vencimento)}</div></div>
             <b>{brl(p.valor)}</b>
-            <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} />
+            <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />
             <button className="btn sm" onClick={() => setPagar(p)}>Pagar</button>
           </div>
         ))}

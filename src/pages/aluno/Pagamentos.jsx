@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useDB, situacaoAluno } from '../../lib/db';
 import { brl, fmtDate, todayISO } from '../../lib/utils';
 import { PageHead, Card, Modal, StatusBadge, Empty } from '../../components/ui';
+import { SeloComprovante } from '../../components/Comprovante';
 import { PixBox, InvestButton } from '../../components/shared';
 
 export default function Pagamentos({ user }) {
@@ -29,7 +30,7 @@ export default function Pagamentos({ user }) {
                 <div className="xs muted">Vencimento {fmtDate(p.vencimento)}</div>
               </div>
               <b>{brl(p.valor)}</b>
-              <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} />
+              <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />
               <button className="btn sm" onClick={() => setPagar(p)}>Pagar</button>
             </div>
           ))}
@@ -46,7 +47,7 @@ export default function Pagamentos({ user }) {
               <thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
               <tbody>
                 {todos.map((p) => (
-                  <tr key={p.id}><td>{p.descricao}</td><td>{fmtDate(p.vencimento)}</td><td>{brl(p.valor)}</td><td><StatusBadge status={p.status === 'pendente' && p.vencimento < hoje ? 'vencido' : p.status} /></td></tr>
+                  <tr key={p.id}><td>{p.descricao}</td><td>{fmtDate(p.vencimento)}</td><td>{brl(p.valor)}</td><td><StatusBadge status={p.status === 'pendente' && p.vencimento < hoje ? 'vencido' : p.status} /> <SeloComprovante p={p} /></td></tr>
                 ))}
               </tbody>
             </table>
@@ -59,7 +60,7 @@ export default function Pagamentos({ user }) {
         {pagar && (
           <>
             <PixBox valor={pagar.valor} descricao={pagar.descricao} txid={pagar.id} filialId={pagar.tipo === 'mensalidade' ? pagar.filialId || user.filialId : undefined} />
-            <p className="xs muted center">Após o pagamento, envie o comprovante. A liberação acontece assim que o professor ou a Central confirmar.</p>
+            <p className="xs muted center">Após pagar, envie o comprovante aqui. A liberação acontece assim que o professor responsável ou a Central conferir.</p>
           </>
         )}
       </Modal>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDB, setDB, professorEmDia, gerarFiliacao, planoFiliacao } from '../../lib/db';
 import { brl, fmtDate, todayISO } from '../../lib/utils';
 import { PageHead, Card, Modal, StatusBadge, toast, useConfirm } from '../../components/ui';
+import { SeloComprovante } from '../../components/Comprovante';
 import { PixBox, InvestButton } from '../../components/shared';
 
 const TAG = { avista: 'Melhor custo', '3x': 'Parcelado', '6x': 'Mais flexível' };
@@ -75,7 +76,7 @@ export default function Filiacao({ user }) {
                 <div className="xs muted">Vencimento {fmtDate(p.vencimento)}</div>
               </div>
               <b>{brl(p.valor)}</b>
-              <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} />
+              <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />
               <button className={`btn sm ${i === 0 ? '' : 'ghost'}`} onClick={() => setPagar(p)}>Pagar</button>
             </div>
           ))}

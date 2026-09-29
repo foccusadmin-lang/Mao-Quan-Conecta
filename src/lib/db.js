@@ -213,6 +213,12 @@ function aplicarRemoto(tabela, evento, novo, velho) {
   emit();
 }
 
+/** Aplica localmente uma linha já gravada pelo servidor (ex.: retorno de RPC), sem reenviar */
+export function aplicarDoServidor(tabela, id, data) {
+  recentes.delete(tabela + ':' + id);
+  aplicarRemoto(tabela, 'UPDATE', { id, data }, null);
+}
+
 // ---------- Autenticação (Google via Supabase) ----------
 export async function entrarComGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
@@ -553,6 +559,8 @@ export function confirmarPagamento(db, pagId, por, metodo = 'manual') {
   p.pagoEm = new Date().toISOString();
   p.confirmadoPor = por;
   p.metodo = metodo;
+  if (p.comprovantes?.length) p.analise = 'aprovado';
+  p.auditoria = [...(p.auditoria || []), { em: p.pagoEm, por, acao: 'confirmado', metodo, comprovantes: p.comprovantes?.length || 0 }];
   if (p.tipo === 'filiacao') {
     const prof = db.professores.find((x) => x.id === p.pessoaId);
     if (prof) {
@@ -567,6 +575,16 @@ export function confirmarPagamento(db, pagId, por, metodo = 'manual') {
     if (a) a.inscritoExame = true;
   }
   notify(db, p.pessoaId, 'Pagamento confirmado ✅', `${p.descricao} — acesso a vídeos, certificados e carteirinha liberado.`);
+}
+
+/** Comprovante não confere: volta a aguardar pagamento, com o motivo registrado na auditoria */
+export function recusarComprovante(db, pagId, por, motivo) {
+  const p = db.pagamentos.find((x) => x.id === pagId);
+  if (!p) return;
+  p.analise = 'recusado';
+  p.motivoRecusa = motivo;
+  p.auditoria = [...(p.auditoria || []), { em: new Date().toISOString(), por, acao: 'comprovante_recusado', motivo }];
+  notify(db, p.pessoaId, 'Comprovante não confirmado ⚠️', `${p.descricao}: ${motivo}. Confira e envie um novo comprovante.`);
 }
 
 export function novoAluno(db, dados) {
