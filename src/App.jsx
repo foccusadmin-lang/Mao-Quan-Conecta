@@ -1,6 +1,7 @@
-﻿import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { useDB, useSession, useAuth, setSession, temRecurso } from './lib/db';
+import { useDB, useSession, useAuth, setSession, temRecurso, recarregar } from './lib/db';
+import { supabase } from './lib/supabase';
 import PrimeiroAcesso from './pages/PrimeiroAcesso';
 import Layout from './components/Layout';
 import { Toaster, toast } from './components/ui';
@@ -179,12 +180,43 @@ function TelaStatus({ titulo, texto, sair, recarregar }) {
 /** Professor que também é atleta: as telas de atleta usam a ficha de praticante (mesmo e-mail Google) */
 function ComoPraticante({ user, children }) {
   const db = useDB();
+  const [ativando, setAtivando] = useState(false);
   const pr = db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase());
-  if (!pr?.atleta?.ativo)
-    return (
-      <div className="alert gold">
-        🏆 A área de atleta é liberada pela Central. Para isso, você precisa ter a matrícula de praticante (menu Meu Plano) e ser convocado como atleta na sua ficha.
+  if (pr?.atleta?.ativo) return children(pr);
+
+  const ativar = async () => {
+    setAtivando(true);
+    try {
+      const dados = {
+        matricula: 'MQ' + Date.now().toString(36).toUpperCase().slice(-6),
+        nome: user.nome, telefone: user.telefone || '', foto: user.foto || null, rg: user.rg || '', cpf: user.cpf || '', nascimento: user.nascimento || '', responsavel: '',
+        saude: { tipoSanguineo: '', alergias: '', lesoes: '', restricoes: '', medicamentos: '', emergenciaNome: '', emergenciaTel: '' },
+        tecnico: [], termos: null, preExame: null, inscritoExame: false, historicoGraduacao: [], qrToken: 'q' + Date.now().toString(36), criadoEm: new Date().toISOString(),
+      };
+      const { error } = await supabase.rpc('mq_ativar_atleta_professor', { p_dados: dados });
+      if (error) throw error;
+      await recarregar();
+      toast('Perfil de atleta ativado! Agora monte sua carreira.');
+    } catch (e) {
+      toast('Não foi possível ativar: ' + e.message);
+    } finally {
+      setAtivando(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="page-head"><div><h2>Atleta</h2><p>Monte seu perfil de atleta e sua vitrine pública</p></div></div>
+      <div className="card pad-lg" style={{ maxWidth: 640 }}>
+        <div style={{ fontSize: 40 }}>🏆</div>
+        <h3 style={{ margin: '6px 0' }}>Ativar meu perfil de atleta</h3>
+        <p className="small">
+          Como professor, você também pode competir e ter a sua vitrine de atleta: medalhas, campeonatos, troféus, fotos e vídeos, com link próprio para patrocinadores.
+          O perfil usa o seu e-mail Google e a sua graduação atual.
+        </p>
+        <p className="xs muted">Ativar o perfil de atleta não gera mensalidade. A mensalidade só existe se você escolher um plano de treino em Meu Plano.</p>
+        <button className="btn gold" disabled={ativando} onClick={ativar}>{ativando ? 'Ativando…' : '🏅 Ativar perfil de atleta'}</button>
       </div>
-    );
-  return children(pr);
+    </>
+  );
 }

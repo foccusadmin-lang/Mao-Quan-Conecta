@@ -481,6 +481,7 @@ export function rotinaFinanceira() {
 
   for (const a of draft.alunos) {
     if (a.status !== 'aprovado') continue;
+    if (a.somenteAtleta && !a.plano) continue; // professor com ficha só de atleta: sem plano de treino, sem mensalidade
     const existe = draft.pagamentos.some((p) => p.pessoaId === a.id && p.tipo === 'mensalidade' && p.competencia === comp);
     if (!existe && a.isento) {
       // Bolsista / plano família: registro do mês já quitado, para o aluno também ter o histórico

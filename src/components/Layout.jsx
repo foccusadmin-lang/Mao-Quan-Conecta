@@ -65,7 +65,7 @@ export default function Layout({ user }) {
   const base = '/' + user.role;
   // Professor também pode ser atleta: vale a ficha de praticante (mesmo e-mail)
   const praticante = user.role === 'professor' ? db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase()) : user;
-  const nav = NAVS[user.role].filter(([p]) => !(p === 'atleta' && !praticante?.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
+  const nav = NAVS[user.role].filter(([p]) => !(p === 'atleta' && user.role === 'aluno' && !praticante?.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
   const EXTRAS = { carreira: 'Construir Carreira' };
   const extra = EXTRAS[loc.pathname.split('/')[2]];
   const current = nav.find(([p]) => loc.pathname === (p ? `${base}/${p}` : base)) || (extra ? ['', '', extra] : nav[0]);
