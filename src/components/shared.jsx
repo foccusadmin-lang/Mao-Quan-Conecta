@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { useDB, responsaveisFilial } from '../lib/db';
+import { useDB } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { pixPayload, chavePixEMV, maskChavePix, TIPOS_PIX, copy, brl, waLink, b64e, todayISO, APP_URL, mapsBusca, mapsRota } from '../lib/utils';
 import { Modal, toast, WAIcon, Card } from './ui';
@@ -51,86 +51,22 @@ export function useRecebedor(filialId) {
   return { carregando: remoto.filialId !== filialId, rec: remoto.filialId === filialId ? remoto.rec : null };
 }
 
-/** Todos os professores responsáveis da filial com chave PIX (principal primeiro) — só com dados completos (Central) */
-export function recebedoresLocal(db, filialId) {
-  const f = db.filiais.find((x) => x.id === filialId);
-  if (!f) return [];
-  const ids = responsaveisFilial(f).map((r) => r.professorId).sort((a, b) => (a === f.professorId ? -1 : b === f.professorId ? 1 : 0));
-  if (ids.some((id) => !db.professores.some((p) => p.id === id))) return null; // cadastro incompleto neste perfil: consultar servidor
-  return ids
-    .map((id) => db.professores.find((p) => p.id === id))
-    .filter((p) => p.ativo !== false && p.pix?.chave?.trim())
-    .map((p) => ({ professorId: p.id, nome: p.nome, titulo: p.titulo, telefone: p.telefone, ...p.pix }));
-}
-
-/** Recebedores da mensalidade da filial (divisão entre os professores responsáveis) */
-export function useRecebedores(filialId) {
-  const db = useDB();
-  const local = filialId ? recebedoresLocal(db, filialId) : [];
-  const [remoto, setRemoto] = useState({ filialId: null, lista: [] });
-  useEffect(() => {
-    if (!filialId || local) return;
-    let vivo = true;
-    supabase.rpc('mq_recebedores_filial', { p_filial: filialId }).then(({ data }) => vivo && setRemoto({ filialId, lista: Array.isArray(data) ? data : [] }));
-    return () => (vivo = false);
-  }, [filialId, !!local]);
-  if (!filialId) return { carregando: false, lista: [] };
-  if (local) return { carregando: false, lista: local };
-  return { carregando: remoto.filialId !== filialId, lista: remoto.filialId === filialId ? remoto.lista : [] };
-}
-
-/** Divide em partes iguais (centavos que sobram vão para a última parte) */
-export function dividirValor(total, n) {
-  const c = Math.round(+total * 100);
-  const base = Math.floor(c / n);
-  return Array.from({ length: n }, (_, i) => (i === n - 1 ? c - base * (n - 1) : base) / 100);
-}
-
 /**
  * QR Code / copia e cola PIX.
- * Com `filialId` (mensalidade), o valor vai para o(s) professor(es) responsável(is) pela filial:
- * com 2 ou mais, a mensalidade é dividida igualmente — um PIX para cada.
- * Sem chave cadastrada, usa a chave da Associação.
+ * Com `filialId` (mensalidade), o valor vai para a chave do professor responsável pela filial;
+ * sem chave cadastrada, usa a chave da Associação.
  */
 export function PixBox({ valor, descricao, txid, filialId }) {
   const db = useDB();
-  const { carregando, lista } = useRecebedores(filialId);
-  if (carregando) return <div className="small muted center">Carregando dados do PIX…</div>;
-  const pag = txid && db.pagamentos.find((x) => x.id === txid);
-  if (lista.length >= 2) {
-    const partes = valor ? dividirValor(valor, lista.length) : [];
-    const divisao = lista.map((r, i) => ({ professorId: r.professorId, nome: `${r.titulo || 'Laoshi'} ${r.nome}`, valor: partes[i] ?? null }));
-    return (
-      <div className="col" style={{ width: '100%' }}>
-        <div className="alert gold small">
-          <div>
-            Esta filial tem <b>{lista.length} professores responsáveis</b>. {valor ? <>A mensalidade de <b>{brl(valor)}</b> é dividida: faça <b>um PIX para cada professor</b> e envie o comprovante de cada um.</> : 'Faça um PIX para cada professor, com a parte de cada um.'}
-          </div>
-        </div>
-        {lista.map((r, i) => (
-          <div key={r.professorId} className="card" style={{ padding: 14 }}>
-            <div className="xs muted center" style={{ fontWeight: 700, letterSpacing: 1 }}>PARTE {i + 1} DE {lista.length}</div>
-            <PixUnico rec={r} valor={partes[i]} descricao={descricao} txid={txid ? `${txid}p${i + 1}` : undefined} />
-            {pag && <EnviarComprovante pagamentoId={txid} parte={divisao[i]} divisao={divisao} />}
-          </div>
-        ))}
-      </div>
-    );
-  }
-  return <PixUnico rec={lista[0] || null} valor={valor} descricao={descricao} txid={txid} comprovante={!!pag} />;
-}
-
-/** Um QR Code PIX (professor ou, sem `rec`, a Associação) */
-function PixUnico({ rec, valor, descricao, txid, comprovante }) {
-  const db = useDB();
+  const { carregando, rec } = useRecebedor(filialId);
   const chave = rec ? chavePixEMV(rec) : db.config.pixChave;
   const nome = rec ? rec.titular || rec.nome : db.config.pixNome;
   const cidade = rec?.cidade || db.config.pixCidade;
-  const payload = !chave ? '' : pixPayload({ chave, nome, cidade, valor, descricao, txid });
+  const payload = carregando || !chave ? '' : pixPayload({ chave, nome, cidade, valor, descricao, txid });
   const qr = useQR(payload);
   const telProf = (rec?.telefone || '').replace(/\D/g, '');
   const whats = telProf.length >= 10 ? '55' + telProf : db.config.whatsapp;
-  const partes = comprovante === undefined; // bloco de uma parte: o comprovante fica abaixo, fora daqui
+  if (carregando) return <div className="small muted center">Carregando dados do PIX…</div>;
   return (
     <div className="col" style={{ alignItems: 'center', textAlign: 'center' }}>
       {qr && <img src={qr} alt="QR Code PIX" style={{ width: 210, height: 210, borderRadius: 12, border: '1px solid var(--line)' }} />}
@@ -153,11 +89,7 @@ function PixUnico({ rec, valor, descricao, txid, comprovante }) {
       {!rec && db.config.infinitePay && (
         <a className="btn gold sm" href={db.config.infinitePay} target="_blank" rel="noreferrer">💳 Pagar com cartão (InfinitePay)</a>
       )}
-      {partes ? (
-        <a className="xs" href={waLink(whats, `Olá! Pagamento pelo app: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">
-          Dúvidas? Falar no WhatsApp{telProf.length >= 10 ? ' com o professor' : ''}
-        </a>
-      ) : comprovante ? (
+      {txid && db.pagamentos.some((x) => x.id === txid) ? (
         <>
           <EnviarComprovante pagamentoId={txid} />
           <a className="xs" href={waLink(whats, `Olá! Enviei o comprovante pelo app: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">

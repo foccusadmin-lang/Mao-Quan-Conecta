@@ -85,7 +85,7 @@ export default function Filiais() {
                       <div style={{ fontWeight: 600 }}>{p ? `${p.titulo} ${p.nome}` : <span className="muted">Professor removido</span>}</div>
                       <div className="row" style={{ gap: 4, marginTop: 2 }}>
                         {(r.departamentos || []).map((x) => <span key={x} className="badge">{x}</span>)}
-                        {f.professorId === r.professorId && equipe.length > 1 && <span className="badge ink" title="Responsável principal">Principal</span>} <span className="badge ok" title="Recebe a parte das mensalidades via PIX">💸 {equipe.length > 1 ? `1/${equipe.length} da mensalidade` : 'Mensalidades'}</span>
+                        {f.professorId === r.professorId && <span className="badge ok" title="Recebe as mensalidades da filial via PIX">💸 Mensalidades</span>}
                       </div>
                     </div>
                   </div>
@@ -124,7 +124,7 @@ export default function Filiais() {
             <div className="card" style={{ background: '#faf8f6' }}>
               <b>🥋 Professores responsáveis</b>
               <p className="xs muted" style={{ margin: '4px 0 10px' }}>
-                Marque as modalidades de cada um (Geral, Tradicional, Esportivo, Sanda, Tai Chi Chuan…). A mensalidade dos alunos é <b>dividida igualmente</b> entre os responsáveis que têm chave PIX cadastrada (ex.: R$ 300 com 2 professores = R$ 150 para cada, um PIX para cada). O marcado como <b>Principal</b> aparece primeiro e representa a filial.
+                Marque as modalidades de cada um (Geral, Tradicional, Esportivo, Sanda, Tai Chi Chuan…). O marcado em <b>💸 Recebe mensalidades</b> é o responsável principal: as mensalidades dos alunos vão para a chave PIX dele.
               </p>
               {edit.equipe.length === 0 && <p className="small muted">Nenhum responsável definido.</p>}
               {edit.equipe.map((r, i) => {
@@ -139,7 +139,7 @@ export default function Filiais() {
                         ))}
                       </select>
                       <label className="check small" title="Recebe as mensalidades da filial via PIX">
-                        <input type="radio" name="principal" checked={!!r.professorId && edit.professorId === r.professorId} disabled={!r.professorId} onChange={() => setEdit({ ...edit, professorId: r.professorId })} /> ⭐ Principal
+                        <input type="radio" name="principal" checked={!!r.professorId && edit.professorId === r.professorId} disabled={!r.professorId} onChange={() => setEdit({ ...edit, professorId: r.professorId })} /> 💸 Recebe mensalidades
                       </label>
                       <button
                         type="button"

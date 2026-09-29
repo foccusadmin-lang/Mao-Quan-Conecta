@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB, ehResponsavel, responsaveisFilial } from '../lib/db';
+import { useDB, setDB, ehResponsavel } from '../lib/db';
 import { TIPOS_PIX, maskChavePix, validarChavePix } from '../lib/utils';
 import { Card, Field, toast } from './ui';
 
@@ -49,8 +49,7 @@ export function MinhaChavePix({ user }) {
   const [pix, setPix] = useState(eu.pix || pixVazio(eu.nome));
   useEffect(() => setPix(eu.pix || pixVazio(eu.nome)), [JSON.stringify(eu.pix || null)]);
   const filial = db.filiais.find((f) => f.id === eu.filialId);
-  const responsavel = filial && ehResponsavel(filial, eu.id);
-  const nResp = filial ? responsaveisFilial(filial).length : 0;
+  const responsavel = filial && filial.professorId === eu.id;
 
   const salvar = () => {
     let pronto;
@@ -71,7 +70,7 @@ export function MinhaChavePix({ user }) {
     <Card title="💸 Minha chave PIX para receber mensalidades">
       {responsavel ? (
         <p className="small" style={{ marginTop: 0 }}>
-          As mensalidades dos alunos de <b>{filial.nome}</b> são pagas direto nesta chave{nResp > 1 ? <> — a filial tem <b>{nResp} professores responsáveis</b>, então o valor é dividido igualmente e cada um recebe a sua parte</> : ''}. <b>Sem chave cadastrada você fica fora da divisão</b> (o valor é dividido só entre quem tem chave; se ninguém tiver, vai para a Associação).
+          As mensalidades dos alunos de <b>{filial.nome}</b> são pagas direto nesta chave. Sem chave cadastrada, o pagamento vai para a chave da Associação.
         </p>
       ) : (
         <div className="alert gold small mb">

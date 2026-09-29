@@ -34,7 +34,7 @@ export default function ProfDashboard({ user }) {
         <SponsorShare nome={`${user.titulo} ${user.nome}`} />
       </PageHead>
 
-      {responsaveisFilial(filial).some((r) => r.professorId === user.id) && !db.professores.find((p) => p.id === user.id)?.pix?.chave && (
+      {filial.professorId === user.id && !db.professores.find((p) => p.id === user.id)?.pix?.chave && (
         <a href="#chave-pix" onClick={(e) => (e.preventDefault(), document.getElementById('chave-pix')?.scrollIntoView({ behavior: 'smooth' }))} className="alert gold mb" style={{ textDecoration: 'none' }}>
           💸 <div className="grow">Cadastre sua chave PIX para receber as mensalidades da filial direto na sua conta.</div> Cadastrar →
         </a>
