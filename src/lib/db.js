@@ -480,9 +480,21 @@ export function rotinaFinanceira() {
   const draft = structuredClone(db0);
 
   for (const a of draft.alunos) {
-    if (a.status !== 'aprovado' || a.isento) continue;
+    if (a.status !== 'aprovado') continue;
     const existe = draft.pagamentos.some((p) => p.pessoaId === a.id && p.tipo === 'mensalidade' && p.competencia === comp);
-    if (!existe) {
+    if (!existe && a.isento) {
+      // Bolsista / plano família: registro do mês já quitado, para o aluno também ter o histórico
+      const fil = draft.filiais.find((f) => f.id === a.filialId);
+      const agora = new Date().toISOString();
+      const motivo = a.isentoPor ? a.isentoMotivo || 'Plano família' : 'Bolsista 100%';
+      draft.pagamentos.push({
+        id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,
+        descricao: `Mensalidade ${comp} — ${motivo}`, valor: 0, valorOriginal: valorPlano(fil, a.plano), vencimento: `${comp}-${dia}`,
+        status: 'pago', pagoEm: agora, metodo: 'isencao', isencao: a.isentoPor ? 'familia' : 'bolsa', confirmadoPor: 'Isenção automática',
+        criadoEm: agora, lembretes: [], auditoria: [{ em: agora, por: 'Sistema', acao: 'isencao', motivo }],
+      });
+      mudou = true;
+    } else if (!existe) {
       const fil = draft.filiais.find((f) => f.id === a.filialId);
       draft.pagamentos.push({
         id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,

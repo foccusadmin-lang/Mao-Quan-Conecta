@@ -200,7 +200,7 @@ export default function Financeiro({ user }) {
                       <td style={{ fontWeight: 600 }}>{nomeDe(p.pessoaId)}</td>
                       <td>{p.descricao}</td>
                       <td>{fmtDate(p.pagoEm)}</td>
-                      <td>{p.metodo === 'dinheiro' ? 'Em mãos' : p.metodo?.toUpperCase()}</td>
+                      <td>{p.metodo === 'dinheiro' ? 'Em mãos' : p.metodo === 'isencao' ? <SeloComprovante p={p} /> : p.metodo?.toUpperCase()}</td>
                       <td>{brl(p.valor)}</td>
                       <td className="small">{p.confirmadoPor}</td>
                       <td className="nowrap"><button className="btn sm ghost" onClick={() => setConferir(p.id)}>{p.comprovantes?.length ? `📎 ${p.comprovantes.length}` : '🧾'} Auditoria</button></td>

@@ -32,6 +32,10 @@ export const urlComprovante = async (caminho) => {
 
 /** Situação do comprovante (para listas) */
 export function SeloComprovante({ p }) {
+  if (p.metodo === 'isencao')
+    return p.isencao === 'familia'
+      ? <span className="badge gold" title={p.descricao}>👨‍👩‍👧 Plano família</span>
+      : <span className="badge gold" title="Mensalidade isenta — bolsa integral">🎓 Bolsista 100%</span>;
   if (p.status === 'pago' && p.comprovantes?.length) return <span className="badge ok" title="Pago com comprovante conferido">📎 Conferido</span>;
   if (p.analise === 'enviado') return <span className="badge warn" title="Comprovante enviado — aguardando conferência">📎 Em conferência</span>;
   if (p.analise === 'recusado') return <span className="badge red" title={p.motivoRecusa || ''}>📎 Recusado</span>;

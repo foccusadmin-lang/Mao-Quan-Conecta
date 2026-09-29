@@ -3,7 +3,7 @@ import { brl, fmtDate, todayISO } from '../lib/utils';
 import { Card, Tabs, StatusBadge, Empty } from './ui';
 import { SeloComprovante } from './Comprovante';
 
-const METODO = { pix: 'PIX', dinheiro: 'Em mãos', manual: 'Confirmado', cartao: 'Cartão' };
+const METODO = { pix: 'PIX', dinheiro: 'Em mãos', manual: 'Confirmado', cartao: 'Cartão', isencao: 'Isenção' };
 
 /** Extrato do pagador: o que está em aberto e o que já foi pago */
 export function ExtratoPagamentos({ pagamentos, onPagar, titulo = '🧾 Minhas mensalidades' }) {
@@ -13,7 +13,9 @@ export function ExtratoPagamentos({ pagamentos, onPagar, titulo = '🧾 Minhas m
   const [aba, setAba] = useState(abertos.length ? 'abertos' : 'pagos');
   const soma = (l) => l.reduce((s, p) => s + +p.valor, 0);
   const ano = hoje.slice(0, 4);
-  const pagosAno = pagos.filter((p) => p.pagoEm?.startsWith(ano));
+  const efetivos = pagos.filter((p) => p.metodo !== 'isencao');
+  const isentos = pagos.filter((p) => p.metodo === 'isencao');
+  const pagosAno = efetivos.filter((p) => p.pagoEm?.startsWith(ano));
   const vencidos = abertos.filter((p) => p.vencimento < hoje);
 
   return (
@@ -31,8 +33,8 @@ export function ExtratoPagamentos({ pagamentos, onPagar, titulo = '🧾 Minhas m
         </div>
         <div className="card" style={{ padding: 12, borderLeft: '4px solid var(--ink)' }}>
           <div className="xs muted">Total já pago</div>
-          <div style={{ fontSize: 20, fontWeight: 800 }}>{brl(soma(pagos))}</div>
-          <div className="xs muted">{pagos.length} pagamento(s)</div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{brl(soma(efetivos))}</div>
+          <div className="xs muted">{efetivos.length} pagamento(s){isentos.length ? ` · ${isentos.length} mês(es) com bolsa/isenção` : ''}</div>
         </div>
       </div>
 
@@ -61,9 +63,12 @@ export function ExtratoPagamentos({ pagamentos, onPagar, titulo = '🧾 Minhas m
                   <tr key={p.id}>
                     <td>{p.descricao}</td>
                     <td className="nowrap">{fmtDate(p.vencimento)}</td>
-                    <td className="nowrap">{fmtDate(p.pagoEm)}</td>
+                    <td className="nowrap">{p.metodo === 'isencao' ? '—' : fmtDate(p.pagoEm)}</td>
                     <td className="small">{METODO[p.metodo] || p.metodo || '—'}</td>
-                    <td className="nowrap" style={{ fontWeight: 700 }}>{brl(p.valor)}</td>
+                    <td className="nowrap" style={{ fontWeight: 700 }}>
+                      {brl(p.valor)}
+                      {p.metodo === 'isencao' && p.valorOriginal > 0 && <div className="xs muted" style={{ fontWeight: 400, textDecoration: 'line-through' }}>{brl(p.valorOriginal)}</div>}
+                    </td>
                     <td><StatusBadge status="pago" /> <SeloComprovante p={p} /></td>
                   </tr>
                 ))}
