@@ -5,6 +5,7 @@ import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Se
 import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
 import { PlanosFilialEditor } from '../../components/Planos';
 import { ConferenciaPagamento, SeloComprovante } from '../../components/Comprovante';
+import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 
 const TIPO = { mensalidade: 'Mensalidade', filiacao: 'Filiação', exame: 'Taxa de exame', manutencao: 'Manutenção', outro: 'Outro' };
 
@@ -18,6 +19,7 @@ export default function Financeiro({ user }) {
   const [novo, setNovo] = useState(null);
   const [pix, setPix] = useState(null);
   const [conferir, setConferir] = useState(null);
+  const [retro, setRetro] = useState(false);
   const [ask, confirmEl] = useConfirm();
   const hoje = todayISO();
   const { rec: recMinhaFilial } = useRecebedor(isAdmin ? null : user.filialId);
@@ -64,6 +66,7 @@ export default function Financeiro({ user }) {
           </select>
         )}
         <button className="btn ghost" onClick={() => (rotinaFinanceira(), toast('Cobranças do mês verificadas.'))}>🔁 Gerar cobranças do mês</button>
+        <button className="btn ghost" onClick={() => setRetro(true)}>↩ Meses anteriores</button>
         <button className="btn" onClick={() => setNovo({ tipo: 'mensalidade', pessoaId: '', valor: '', vencimento: hoje, descricao: '' })}>+ Lançamento</button>
       </PageHead>
 
@@ -279,6 +282,10 @@ export default function Financeiro({ user }) {
           </Card>
         </div>
       )}
+
+      <Modal open={retro} onClose={() => setRetro(false)} title="Cobrar meses anteriores" wide>
+        {retro && <CobrancaRetroativa user={user} alunos={alunosEscopo} onFeito={() => (setRetro(false), setTab('abertos'))} />}
+      </Modal>
 
       <Modal open={!!conferir} onClose={() => setConferir(null)} title="Conferência e auditoria do pagamento" wide>
         {conferir && (() => {

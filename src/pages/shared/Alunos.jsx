@@ -4,6 +4,7 @@ import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
 import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
+import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 
 export default function Alunos({ user }) {
@@ -200,6 +201,7 @@ function AlunoModal({ id, user, onClose, ask }) {
   const [f, setF] = useState(() => structuredClone(a));
   const [nota, setNota] = useState({ desempenho: 3, disciplina: 3, wude: 3, obs: '' });
   const [promo, setPromo] = useState(null);
+  const [retro, setRetro] = useState(false);
   const isAdmin = user.role === 'admin';
   if (!a) return null;
   const podeGraduar = podeCorrigirGraduacao(db, user, a);
@@ -433,6 +435,14 @@ function AlunoModal({ id, user, onClose, ask }) {
             </table>
           </div>
           {pags.length === 0 && <Empty icon="🧾">Sem lançamentos.</Empty>}
+          {!a.isento && (retro ? (
+            <div className="card" style={{ background: '#faf8f6' }}>
+              <div className="row between mb"><b>↩ Cobrar meses anteriores</b><button className="btn sm ghost" onClick={() => setRetro(false)}>Fechar</button></div>
+              <CobrancaRetroativa user={user} alunoId={a.id} onFeito={() => setRetro(false)} />
+            </div>
+          ) : (
+            <div><button className="btn ghost" onClick={() => setRetro(true)}>↩ Cobrar meses anteriores (pendências de antes do app)</button></div>
+          ))}
         </div>
       )}
 
