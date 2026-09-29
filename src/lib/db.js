@@ -47,6 +47,34 @@ function normalizar(data) {
   return data;
 }
 
+// ---------- Retomada após atualização do app ----------
+// Antes de recarregar para aplicar uma versão nova, guarda sessão e dados na aba;
+// ao reabrir, a tela volta na hora (sem "Conectando…") e o servidor é conferido por trás.
+const CHAVE_RETOMADA = 'mq-retomar';
+let retomando = null; // id do usuário Supabase da sessão guardada
+try {
+  const snap = JSON.parse(sessionStorage.getItem(CHAVE_RETOMADA) || 'null');
+  sessionStorage.removeItem(CHAVE_RETOMADA);
+  if (snap && Date.now() - snap.t < 10 * 60 * 1000 && snap.auth?.status === 'pronto' && snap.state) {
+    state = normalizar(snap.state);
+    servidor = structuredClone(state);
+    session = snap.session;
+    auth = snap.auth;
+    retomando = snap.usuario;
+  }
+} catch {}
+
+/** Guarda o estado atual para a próxima carga da aba (usado pela atualização automática) */
+export function salvarRetomada() {
+  if (auth.status !== 'pronto' || !sessaoSupabase) return false;
+  try {
+    sessionStorage.setItem(CHAVE_RETOMADA, JSON.stringify({ t: Date.now(), usuario: sessaoSupabase.user.id, session, auth, state }));
+    return true;
+  } catch {
+    return false; // sem espaço: a próxima carga segue o caminho normal
+  }
+}
+
 export function getDB() {
   return state;
 }
@@ -298,8 +326,13 @@ async function processarSessao(s) {
       await carregarTudo().catch(() => {});
       return;
     }
-    auth = { status: 'carregando', email: s.user.email };
-    emit();
+    // Retomada após atualização: a tela já está montada com os dados guardados; confere em silêncio
+    const silencioso = retomando && retomando === s.user.id;
+    retomando = null;
+    if (!silencioso) {
+      auth = { status: 'carregando', email: s.user.email };
+      emit();
+    }
     const { vazio } = await carregarTudo();
     const { data: quem } = await supabase.rpc('mq_whoami');
     // Primeiro acesso do administrador num banco vazio: grava a configuração inicial

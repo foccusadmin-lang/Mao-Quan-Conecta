@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import App from './App';
 import './styles.css';
-import { flush } from './lib/db';
+import { flush, salvarRetomada } from './lib/db';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -17,9 +17,11 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
 }
 
-// Atualização automática: o app costuma ficar aberto (ou instalado) por dias sem recarregar.
-// Ao detectar versão nova, grava o que estiver pendente e recarrega na MESMA tela (a rota fica no endereço),
-// só em momento seguro: sem campo sendo digitado, sem janela/modal aberta e sem envio em andamento.
+// Atualização automática, sem tirar o usuário da tela em que está:
+// - a versão nova é baixada e fica guardada; só é aplicada quando o app vai para segundo plano
+//   (troca de aba, celular bloqueado, app minimizado) — ninguém vê a troca;
+// - antes, grava o pendente e guarda sessão + dados, então a tela volta igual, na mesma página e sem "Conectando…";
+// - nunca aplica com campo em edição, janela aberta ou envio em andamento.
 if (import.meta.env.PROD) {
   const achar = (txt) => txt.match(/assets\/index-[\w-]+\.js/)?.[0];
   const atual = [...document.scripts].map((s) => achar(s.src || '')).find(Boolean);
@@ -35,35 +37,28 @@ if (import.meta.env.PROD) {
   };
 
   const aplicar = async () => {
-    if (!pendente || atualizando || !seguro()) return;
+    if (!pendente || atualizando || document.visibilityState !== 'hidden' || !seguro()) return;
     atualizando = true;
-    const el = document.createElement('div');
-    el.setAttribute('role', 'status');
-    el.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10000;background:#141414;color:#fff;padding:10px 16px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.3);font:600 14px Inter,system-ui,sans-serif';
-    el.textContent = '✨ Atualizando o app…';
-    document.body.appendChild(el);
     try {
-
-      await Promise.race([flush(), new Promise((r) => setTimeout(r, 4000))]);
+      await Promise.race([flush(), new Promise((r) => setTimeout(r, 3000))]);
     } catch {}
+    salvarRetomada();
     location.reload();
   };
 
   const verificar = async () => {
-    if (!atual || document.visibilityState === 'hidden') return;
-    if (pendente) return aplicar();
+    if (!atual || pendente) return;
     try {
       const nova = achar(await (await fetch('./index.html', { cache: 'no-store' })).text());
       if (nova && nova !== atual) {
         pendente = true;
-        aplicar();
+        // Baixa a versão nova já agora, para a troca ser instantânea
+        fetch('./' + nova).catch(() => {});
       }
     } catch {}
   };
 
   setInterval(verificar, 2 * 60 * 1000);
-  setInterval(() => pendente && aplicar(), 15 * 1000); // tenta de novo quando o usuário terminar o que está fazendo
-  document.addEventListener('visibilitychange', verificar);
   window.addEventListener('focus', verificar);
-  window.addEventListener('hashchange', () => pendente && setTimeout(aplicar, 300)); // troca de tela é um bom momento
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'hidden' ? aplicar() : verificar()));
 }
