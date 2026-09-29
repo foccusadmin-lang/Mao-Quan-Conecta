@@ -18,13 +18,17 @@ export default function ProfMeusDados({ user }) {
     const erro = validarDados(f);
     if (erro) return toast(erro);
     const dados = { ...f, nome: f.nome.trim().replace(/\s+/g, ' ') };
+    if ((f.foto || null) !== (eu.foto || null)) dados.fotoDefinida = true; // não volta a ser a foto do Google
     const mudou = alteracoesImportantes(eu, dados);
     const email = (eu.email || '').toLowerCase();
     setDB((d) => {
       Object.assign(d.professores.find((p) => p.id === eu.id), dados);
       // Mesma pessoa como praticante (matrícula de aluno com o mesmo e-mail): mantém os dados iguais
       const pr = d.alunos.find((a) => (a.email || '').toLowerCase() === email);
-      if (pr) CAMPOS.forEach((k) => (pr[k] = dados[k]));
+      if (pr) {
+        CAMPOS.forEach((k) => (pr[k] = dados[k]));
+        if (dados.fotoDefinida) pr.fotoDefinida = true;
+      }
       if (mudou.length) notify(d, 'admin', 'Professor atualizou o cadastro', `${dados.nome} (${filialNome(d, eu.filialId)}) atualizou: ${mudou.join(', ')}.`);
     });
     toast('Dados atualizados.');

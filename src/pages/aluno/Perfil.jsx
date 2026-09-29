@@ -15,6 +15,7 @@ export default function Perfil({ user }) {
     const erro = validarDados(f);
     if (erro) return toast(erro);
     const dados = { ...f, nome: f.nome.trim().replace(/\s+/g, ' ') };
+    if ((f.foto || null) !== (user.foto || null)) dados.fotoDefinida = true; // não volta a ser a foto do Google
     const mudou = alteracoesImportantes(user, dados);
     setDB((d) => {
       Object.assign(d.alunos.find((a) => a.id === user.id), dados);

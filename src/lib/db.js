@@ -279,7 +279,7 @@ async function identificar() {
     setDB((d) => {
       const p = d.professores.find((x) => x.id === quem.professor_id);
       if (p) {
-        if (!p.foto && foto) p.foto = foto;
+        if (!p.foto && foto && !p.fotoDefinida) p.foto = foto; // foto escolhida pelo usuário/Central nunca é trocada pela do Google
         p.ultimoAcesso = agora;
       }
     });
@@ -294,7 +294,7 @@ async function identificar() {
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === quem.aluno_id);
       if (x) {
-        if (!x.foto && foto) x.foto = foto;
+        if (!x.foto && foto && !x.fotoDefinida) x.foto = foto;
         x.ultimoAcesso = agora;
       }
     });

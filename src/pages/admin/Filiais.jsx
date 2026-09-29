@@ -35,7 +35,11 @@ export default function Filiais() {
         const p = d.professores.find((x) => x.id === professorId);
         if (p) p.filialId = fid;
       });
-      if (principal && edit._fotoProf !== undefined) d.professores.find((x) => x.id === principal).foto = edit._fotoProf;
+      if (principal && edit._fotoProf !== undefined) {
+        const p = d.professores.find((x) => x.id === principal);
+        p.foto = edit._fotoProf;
+        p.fotoDefinida = true; // não volta a ser a foto do Google
+      }
     });
     setEdit(null);
     toast('Filial salva.');

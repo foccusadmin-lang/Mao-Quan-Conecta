@@ -212,7 +212,8 @@ function AlunoModal({ id, user, onClose, ask }) {
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === id);
       const antes = x.atleta?.ativo;
-      Object.assign(x, { ...f, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
+      if ((f.foto || null) !== (x.foto || null)) x.fotoDefinida = true; // não volta a ser a foto do Google
+      Object.assign(x, { ...f, fotoDefinida: x.fotoDefinida, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
       if (!x.plano) delete x.plano;
       if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
       if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);

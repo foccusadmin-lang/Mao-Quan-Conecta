@@ -30,8 +30,16 @@ export default function Professores() {
       let id = edit.id;
       if (id) {
         const alvo = d.professores.find((p) => p.id === id);
+        if ((data.foto || null) !== (alvo.foto || null)) data.fotoDefinida = true; // não volta a ser a foto do Google
         Object.assign(alvo, data);
         if (!pix) delete alvo.pix;
+        // Mesma pessoa como praticante: nome e foto iguais nas duas fichas
+        const pr = d.alunos.find((a) => (a.email || '').toLowerCase() === email);
+        if (pr) {
+          pr.nome = data.nome;
+          pr.foto = data.foto;
+          if (data.fotoDefinida) pr.fotoDefinida = true;
+        }
       } else {
         id = uid('pr');
         d.professores.push({ ...data, id, criadoEm: new Date().toISOString() });
