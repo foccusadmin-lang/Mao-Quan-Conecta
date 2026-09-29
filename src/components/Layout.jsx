@@ -35,6 +35,7 @@ export const NAVS = {
     ['onde-treinar', '📍', 'Onde Treinar'],
     ['carteira', '🪪', 'Minha Carteirinha'],
     ['filiacao', '🏅', 'Filiação'],
+    ['plano', '📋', 'Meu Plano'],
   ],
   aluno: [
     ['', '🏠', 'Início'],

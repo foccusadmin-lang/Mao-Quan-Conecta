@@ -32,6 +32,7 @@ import Presenca from './pages/professor/Presenca';
 import Estudo from './pages/professor/Estudo';
 import Filiacao from './pages/professor/Filiacao';
 import ProfCarteira from './pages/professor/Carteira';
+import ProfMeuPlano from './pages/professor/MeuPlano';
 
 import AlunoGate from './pages/aluno/Gate';
 import AlunoHome from './pages/aluno/Home';
@@ -125,6 +126,7 @@ export default function App() {
             <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
             {temRecurso(user, 'carteira') && <Route path="carteira" element={<ProfCarteira user={user} />} />}
             {temRecurso(user, 'filiacao') && <Route path="filiacao" element={<Filiacao user={user} />} />}
+            <Route path="plano" element={<ProfMeuPlano user={user} />} />
           </Route>
         )}
 

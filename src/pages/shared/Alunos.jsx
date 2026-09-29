@@ -85,7 +85,7 @@ export default function Alunos({ user }) {
                         <div className="row" style={{ flexWrap: 'nowrap' }}>
                           <Avatar src={a.foto} name={a.nome} />
                           <div>
-                            <div style={{ fontWeight: 600 }}>{a.nome} {a.atleta?.ativo && <span title="Atleta">🏆</span>} {a.saude?.restricoes && <span title="Restrição médica">⚕️</span>}</div>
+                            <div style={{ fontWeight: 600 }}>{a.nome} {(a.praticanteProfessor || db.professores.some((p) => p.email === (a.email || "").toLowerCase())) && <span className="badge gold" title="Professor também matriculado como praticante">Professor</span>} {a.atleta?.ativo && <span title="Atleta">🏆</span>} {a.saude?.restricoes && <span title="Restrição médica">⚕️</span>}</div>
                             <div className="xs muted">{a.matricula} · {a.email}</div>
                           </div>
                         </div>
