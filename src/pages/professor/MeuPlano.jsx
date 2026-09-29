@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useDB, recarregar, filialNome } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
-import { brl, fmtDate, todayISO, uid } from '../../lib/utils';
+import { brl, todayISO, uid } from '../../lib/utils';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
-import { PageHead, Card, Modal, StatusBadge, Empty, toast } from '../../components/ui';
-import { SeloComprovante } from '../../components/Comprovante';
+import { PageHead, Card, Modal, toast } from '../../components/ui';
+import { ExtratoPagamentos } from '../../components/Extrato';
 import { PixBox } from '../../components/shared';
 import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
 
@@ -26,7 +26,7 @@ export default function ProfMeuPlano({ user }) {
   }, [pr?.id]);
 
   const filial = db.filiais.find((f) => f.id === (pr?.filialId || filialId));
-  const hoje = todayISO();
+
 
   const ativar = async () => {
     if (!filial) return toast('Filial Sede não encontrada. Fale com a Central.');
@@ -83,7 +83,6 @@ export default function ProfMeuPlano({ user }) {
       </>
     );
 
-  const abertos = db.pagamentos.filter((p) => p.pessoaId === pr.id && p.status === 'pendente').sort((a, b) => a.vencimento.localeCompare(b.vencimento));
 
   return (
     <>
@@ -110,16 +109,7 @@ export default function ProfMeuPlano({ user }) {
         </Card>
       )}
 
-      <Card title="🧾 Minhas mensalidades em aberto">
-        {abertos.length === 0 ? <Empty icon="✅">Nada em aberto.</Empty> : abertos.map((p) => (
-          <div key={p.id} className="list-item" style={{ flexWrap: 'wrap' }}>
-            <div className="grow"><div style={{ fontWeight: 600 }}>{p.descricao}</div><div className="xs muted">Vencimento {fmtDate(p.vencimento)}</div></div>
-            <b>{brl(p.valor)}</b>
-            <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />
-            <button className="btn sm" onClick={() => setPagar(p)}>Pagar</button>
-          </div>
-        ))}
-      </Card>
+      <ExtratoPagamentos pagamentos={db.pagamentos.filter((p) => p.pessoaId === pr.id)} onPagar={setPagar} />
 
       <Modal open={!!pagar} onClose={() => setPagar(null)} title={pagar?.descricao}>
         {pagar && <PixBox valor={pagar.valor} descricao={pagar.descricao} txid={pagar.id} filialId={pagar.tipo === 'mensalidade' ? pagar.filialId : undefined} />}

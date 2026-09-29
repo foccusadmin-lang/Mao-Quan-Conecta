@@ -122,10 +122,12 @@ h1, h2, h3, h4 { margin: 0 0 0.4em; line-height: 1.2; }
 .page-head h2 { font-family: var(--brush); font-weight: 400; font-size: 28px; margin: 0; }
 .page-head p { margin: 2px 0 0; color: var(--muted); }
 
-.stat { position: relative; overflow: hidden; }
-.stat .v { font-size: 30px; font-weight: 800; line-height: 1.1; }
-.stat .l { color: var(--muted); font-size: 13px; font-weight: 500; }
-.stat .i { position: absolute; right: 12px; top: 10px; font-size: 26px; opacity: 0.9; }
+/* Indicador: ícone em coluna própria (nunca sobre o valor) e valor que se ajusta à largura do cartão */
+.stat { position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'l i' 'v v' 'h h'; column-gap: 10px; row-gap: 4px; align-content: start; container-type: inline-size; }
+.stat .l { grid-area: l; align-self: center; color: var(--muted); font-size: 13px; font-weight: 500; min-width: 0; }
+.stat .i { grid-area: i; font-size: 22px; line-height: 1; opacity: 0.9; }
+.stat .v { grid-area: v; font-size: clamp(15px, 10cqw, 30px); font-weight: 800; line-height: 1.15; white-space: nowrap; min-width: 0; }
+.stat > .xs { grid-area: h; margin-top: 0 !important; }
 .stat.red { border-left: 4px solid var(--red); }
 .stat.gold { border-left: 4px solid var(--gold); }
 .stat.ink { border-left: 4px solid var(--ink); }
@@ -231,8 +233,9 @@ tr:last-child td { border-bottom: 0; }
 /* Login */
 .login-wrap { min-height: 100%; display: grid; grid-template-columns: 1.1fr 1fr; }
 .login-art { background: var(--ink); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; position: relative; overflow: hidden; }
-.login-art::before { content: '猫拳'; font-family: var(--han); position: absolute; left: -20px; top: 10%; font-size: 220px; color: rgba(208, 18, 27, 0.12); writing-mode: vertical-rl; }
-.login-art::after { content: '功夫'; font-family: var(--han); position: absolute; right: -20px; bottom: 5%; font-size: 220px; color: rgba(255, 255, 255, 0.05); writing-mode: vertical-rl; }
+.login-art::before { content: '猫拳'; font-family: var(--han); position: absolute; left: -20px; top: 10%; font-size: 220px; color: rgba(208, 18, 27, 0.12); writing-mode: vertical-rl; pointer-events: none; }
+.login-art::after { content: '功夫'; font-family: var(--han); position: absolute; right: -20px; bottom: 5%; font-size: 220px; color: rgba(255, 255, 255, 0.05); writing-mode: vertical-rl; pointer-events: none; }
+.login-art > * { position: relative; z-index: 1; }
 .login-art img { width: min(380px, 70%); border-radius: 50%; background: #fff; padding: 10px; position: relative; z-index: 1; box-shadow: 0 0 0 6px var(--red); }
 .login-art .tag { margin-top: 26px; font-family: var(--brush); font-size: 26px; position: relative; z-index: 1; text-align: center; }
 .login-art .tag b { color: var(--red); font-weight: 400; }
@@ -276,7 +279,8 @@ tr:last-child td { border-bottom: 0; }
 
 /* QR / carteira digital */
 .wallet { background: linear-gradient(160deg, var(--ink), #2a0a0c 70%, var(--red-dark)); color: #fff; border-radius: 22px; padding: 22px; text-align: center; position: relative; overflow: hidden; }
-.wallet::before { content: '猫'; font-family: var(--han); position: absolute; right: -10px; top: -30px; font-size: 170px; color: rgba(255, 255, 255, 0.05); }
+.wallet::before { content: '猫'; font-family: var(--han); position: absolute; right: -10px; top: -30px; font-size: 170px; color: rgba(255, 255, 255, 0.05); pointer-events: none; }
+.wallet > * { position: relative; z-index: 1; }
 .wallet .qrbox { background: #fff; border-radius: 16px; padding: 12px; display: inline-block; margin: 14px 0; }
 .wallet .qrbox img { width: 220px; height: 220px; display: block; }
 
@@ -306,7 +310,7 @@ tr:last-child td { border-bottom: 0; }
 .hero {
   background: var(--ink); color: #fff; border-radius: 18px; padding: 22px; position: relative; overflow: hidden;
 }
-.hero::after { content: '功夫'; font-family: var(--han); position: absolute; right: 10px; bottom: -40px; font-size: 130px; color: rgba(208, 18, 27, 0.25); }
+.hero::after { content: '功夫'; font-family: var(--han); position: absolute; right: 10px; bottom: -40px; font-size: 130px; color: rgba(208, 18, 27, 0.25); pointer-events: none; }
 .hero h2 { font-family: var(--brush); font-weight: 400; font-size: 26px; position: relative; z-index: 1; }
 .hero > * { position: relative; z-index: 1; }
 
@@ -337,7 +341,6 @@ tr:last-child td { border-bottom: 0; }
 /* Overrides finais */
 .btn.burger { display: none; }
 @media (max-width: 1023px) { .btn.burger { display: inline-flex; } }
-.stat .v { font-size: clamp(22px, 2.1vw, 30px); padding-right: 34px; }
 
 /* ---------- Carteirinha oficial (Identidade do Praticante) ---------- */
 .idc-flip { width: 100%; max-width: 560px; }
@@ -380,7 +383,7 @@ tr:last-child td { border-bottom: 0; }
 .galeria-legenda { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 8px; font-size: 12.5px; color: #fff; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); pointer-events: none; }
 .galeria-remover { position: absolute; top: 6px; right: 6px; min-height: 30px; }
 .vitrine-hero { background: radial-gradient(circle at 85% 10%, rgba(208, 18, 27, 0.55), transparent 55%), linear-gradient(160deg, #141414 20%, #2a0a0c 75%, #9e0c13); color: #fff; padding: 34px 18px 28px; padding-top: calc(34px + env(safe-area-inset-top)); position: relative; overflow: hidden; }
-.vitrine-hero::after { content: '運動員'; font-family: var(--han); position: absolute; right: -10px; bottom: -30px; font-size: 130px; color: rgba(255, 255, 255, 0.05); writing-mode: vertical-rl; }
+.vitrine-hero::after { content: '運動員'; font-family: var(--han); position: absolute; right: -10px; bottom: -30px; font-size: 130px; color: rgba(255, 255, 255, 0.05); writing-mode: vertical-rl; pointer-events: none; }
 .vitrine-hero .inner { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
 .vitrine-foto { width: 128px; height: 128px; border-radius: 50%; object-fit: cover; border: 4px solid var(--red); background: #333; flex: none; }
 .vitrine-nome { font-family: var(--brush); font-weight: 400; font-size: clamp(30px, 6vw, 48px); line-height: 1.05; margin: 0; }

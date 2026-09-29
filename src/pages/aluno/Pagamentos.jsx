@@ -1,16 +1,16 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useDB, situacaoAluno } from '../../lib/db';
-import { brl, fmtDate, todayISO } from '../../lib/utils';
-import { PageHead, Card, Modal, StatusBadge, Empty } from '../../components/ui';
-import { SeloComprovante } from '../../components/Comprovante';
+
+import { PageHead, Card, Modal } from '../../components/ui';
+import { ExtratoPagamentos } from '../../components/Extrato';
 import { PixBox, InvestButton } from '../../components/shared';
 
 export default function Pagamentos({ user }) {
   const db = useDB();
   const [pagar, setPagar] = useState(null);
   const fin = situacaoAluno(db, user);
-  const hoje = todayISO();
+
   const todos = db.pagamentos.filter((p) => p.pessoaId === user.id).sort((a, b) => b.vencimento.localeCompare(a.vencimento));
 
   return (
@@ -20,39 +20,10 @@ export default function Pagamentos({ user }) {
       {!user.isento && <Link to="/aluno/plano" className="alert ink mb" style={{ textDecoration: 'none' }}>📋 <div className="grow">Escolha ou altere suas modalidades, o pacote completo ou o plano família.</div> Meu Plano →</Link>}
       {fin.bloqueado && <div className="alert red mb">⛔ Existem mensalidades vencidas. Conteúdo, certificados e carteirinha ficam bloqueados até a confirmação.</div>}
 
-      <div className="grid g2">
-        <Card title="🧾 Em aberto">
-          {fin.emAberto.length === 0 && <Empty icon="✅">Nada em aberto. Obrigado!</Empty>}
-          {fin.emAberto.map((p) => (
-            <div key={p.id} className="list-item" style={{ flexWrap: 'wrap' }}>
-              <div className="grow">
-                <div style={{ fontWeight: 600 }}>{p.descricao}</div>
-                <div className="xs muted">Vencimento {fmtDate(p.vencimento)}</div>
-              </div>
-              <b>{brl(p.valor)}</b>
-              <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />
-              <button className="btn sm" onClick={() => setPagar(p)}>Pagar</button>
-            </div>
-          ))}
-        </Card>
-        <Card title="💳 Formas de pagamento">
-          <PixBox descricao="Mensalidade Mao Quan" filialId={user.filialId} />
-        </Card>
-      </div>
+      <ExtratoPagamentos titulo="🧾 Minhas mensalidades e taxas" pagamentos={todos} onPagar={setPagar} />
 
-      <Card title="Histórico" className="mt">
-        {todos.length === 0 ? <Empty icon="🧾">Sem lançamentos.</Empty> : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Descrição</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
-              <tbody>
-                {todos.map((p) => (
-                  <tr key={p.id}><td>{p.descricao}</td><td>{fmtDate(p.vencimento)}</td><td>{brl(p.valor)}</td><td><StatusBadge status={p.status === 'pendente' && p.vencimento < hoje ? 'vencido' : p.status} /> <SeloComprovante p={p} /></td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <Card title="💳 Formas de pagamento" className="mt">
+        <PixBox descricao="Mensalidade Mao Quan" filialId={user.filialId} />
       </Card>
       <div className="mt"><InvestButton /></div>
 
