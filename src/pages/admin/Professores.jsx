@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { IDX_PRIMEIRA_PRETA } from '../../lib/seed';
-import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso } from '../../lib/db';
+import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso, adicionarResponsavel, removerResponsavel, ehResponsavel } from '../../lib/db';
 import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { CamposChavePix, prepararPix, pixVazio } from '../../components/ChavePix';
@@ -39,7 +39,7 @@ export default function Professores() {
       }
       if (data.filialId) {
         const f = d.filiais.find((x) => x.id === data.filialId);
-        if (f && !f.professorId) f.professorId = id;
+        if (f && !f.professorId) adicionarResponsavel(f, id);
       }
     });
     setEdit(null);
@@ -89,7 +89,7 @@ export default function Professores() {
                     <td>
                       {filialNome(db, p.filialId)}
                       <div className="xs">
-                        {db.filiais.some((f) => f.professorId === p.id) && <span className="badge gold" style={{ marginRight: 4 }}>Responsável</span>}
+                        {db.filiais.some((f) => ehResponsavel(f, p.id)) && <span className="badge gold" style={{ marginRight: 4 }}>{db.filiais.some((f) => f.professorId === p.id) ? 'Responsável principal' : 'Responsável'}</span>}
                         {p.pix?.chave ? <span className="badge ok">PIX ✓</span> : <span className="badge">Sem PIX</span>}
                       </div>
                     </td>
@@ -99,7 +99,7 @@ export default function Professores() {
                     <td className="nowrap">
                       <button className="btn sm ghost" onClick={() => promover(p)} title="Propor/Aprovar graduação">🎖️</button>{' '}
                       <button className="btn sm dark" onClick={() => setEdit({ ...vazio, ...p, filialId: p.filialId || '', recursos: { ...recursosPadrao(), ...p.recursos } })}>Editar</button>{' '}
-                      <button className="btn sm ghost" onClick={() => ask(`Excluir ${p.nome}?`, () => setDB((d) => { d.professores = d.professores.filter((x) => x.id !== p.id); d.filiais.forEach((f) => f.professorId === p.id && (f.professorId = null)); }), 'Excluir')}>🗑</button>
+                      <button className="btn sm ghost" onClick={() => ask(`Excluir ${p.nome}?`, () => setDB((d) => { d.professores = d.professores.filter((x) => x.id !== p.id); d.filiais.forEach((f) => removerResponsavel(f, p.id)); }), 'Excluir')}>🗑</button>
                     </td>
                   </tr>
                 ))}

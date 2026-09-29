@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB } from '../lib/db';
+import { useDB, setDB, ehResponsavel } from '../lib/db';
 import { TIPOS_PIX, maskChavePix, validarChavePix } from '../lib/utils';
 import { Card, Field, toast } from './ui';
 
@@ -74,7 +74,9 @@ export function MinhaChavePix({ user }) {
         </p>
       ) : (
         <div className="alert gold small mb">
-          Você não é o professor responsável {filial ? <>por <b>{filial.nome}</b></> : 'por uma filial'}. As mensalidades só são creditadas ao professor responsável definido pela Central.
+          {filial && ehResponsavel(filial, eu.id)
+            ? <>Você faz parte da equipe responsável por <b>{filial.nome}</b>, mas as mensalidades são creditadas ao responsável principal definido pela Central. Cadastre sua chave para o caso de a Central indicar você.</>
+            : <>Você não é o professor responsável {filial ? <>por <b>{filial.nome}</b></> : 'por uma filial'}. As mensalidades só são creditadas ao responsável principal definido pela Central.</>}
         </div>
       )}
       <CamposChavePix pix={pix} onChange={setPix} />

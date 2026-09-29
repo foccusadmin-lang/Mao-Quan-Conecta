@@ -384,7 +384,7 @@ export function promoverAProfessor(db, alunoId, { titulo = 'Laoshi', filialId, r
   db.professores.push(prof);
   a.promovidoProfessor = { professorId: prof.id, data: todayISO() };
   const fil = db.filiais.find((f) => f.id === prof.filialId);
-  if (fil && !fil.professorId) fil.professorId = prof.id;
+  adicionarResponsavel(fil, prof.id);
   notify(db, prof.id, `Você foi promovido(a) a ${titulo}! 🎖️`, 'No próximo acesso com sua conta Google, o Painel do Professor será aberto automaticamente.');
   notify(db, a.id, `Você foi promovido(a) a ${titulo}! 🎖️`, 'Saia e entre novamente com sua conta Google para acessar o Painel do Professor.');
   return prof;
@@ -394,6 +394,37 @@ export function promoverAProfessor(db, alunoId, { titulo = 'Laoshi', filialId, r
 export const faixaNome = (db, idx) => db.config.faixas[idx]?.nome || '—';
 export const faixaNivel = (db, idx) => db.config.faixas[idx]?.nivel || '—';
 export const filialNome = (db, id) => db.filiais.find((f) => f.id === id)?.nome || '—';
+
+// ---------- Professores responsáveis pela filial ----------
+export const DEPARTAMENTOS_PADRAO = ['Tradicional', 'Esportivo', 'Sanda', 'Taichi'];
+export const departamentos = (db) => (db.config.departamentos || DEPARTAMENTOS_PADRAO).map((x) => x.trim()).filter(Boolean);
+
+/**
+ * Equipe de responsáveis da filial: [{ professorId, departamentos: [] }].
+ * `filial.professorId` continua sendo o responsável principal (recebe as mensalidades via PIX).
+ */
+export function responsaveisFilial(f) {
+  const lista = (f?.equipe || []).filter((r) => r.professorId);
+  if (f?.professorId && !lista.some((r) => r.professorId === f.professorId)) lista.unshift({ professorId: f.professorId, departamentos: [] });
+  return lista;
+}
+
+/** Inclui o professor como responsável (e principal, se a filial ainda não tiver) */
+export function adicionarResponsavel(f, professorId) {
+  if (!f || !professorId) return;
+  f.equipe = responsaveisFilial(f);
+  if (!f.equipe.some((r) => r.professorId === professorId)) f.equipe.push({ professorId, departamentos: [] });
+  if (!f.professorId) f.professorId = professorId;
+}
+
+/** Retira o professor da equipe; se era o principal, o próximo da lista assume */
+export function removerResponsavel(f, professorId) {
+  if (!ehResponsavel(f, professorId)) return;
+  f.equipe = responsaveisFilial(f).filter((r) => r.professorId !== professorId);
+  if (f.professorId === professorId) f.professorId = f.equipe[0]?.professorId || null;
+}
+
+export const ehResponsavel = (f, professorId) => responsaveisFilial(f).some((r) => r.professorId === professorId);
 
 /** Situação financeira do aluno: inadimplente se tiver mensalidade vencida além da tolerância */
 export function situacaoAluno(db, aluno) {
@@ -619,6 +650,6 @@ export function limparDemo() {
     db.professores = db.professores.filter((p) => !p.demo);
     db.pagamentos = db.pagamentos.filter((p) => !ids.has(p.pessoaId));
     db.presencas = db.presencas.filter((p) => !ids.has(p.alunoId));
-    db.filiais.forEach((f) => ids.has(f.professorId) && (f.professorId = null));
+    db.filiais.forEach((f) => responsaveisFilial(f).forEach((r) => ids.has(r.professorId) && removerResponsavel(f, r.professorId)));
   });
 }

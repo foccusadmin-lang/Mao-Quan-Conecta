@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { useDB, setDB, replaceDB } from '../../lib/db';
+import { useDB, setDB, replaceDB, DEPARTAMENTOS_PADRAO } from '../../lib/db';
 import { uid } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo } from '../../components/ui';
 import { FAIXAS_PADRAO, NIVEIS } from '../../lib/seed';
@@ -133,6 +133,9 @@ export default function Config() {
           </div>
           <Field label="Polos de atleta (um por linha)" style={{ marginTop: 14 }}>
             <textarea rows={3} value={c.polos.join('\n')} onChange={(e) => setC({ ...c, polos: e.target.value.split('\n') })} />
+          </Field>
+          <Field label="Departamentos / modalidades das filiais (um por linha)" hint="Usados para definir a área de cada professor responsável em Filiais">
+            <textarea rows={4} value={(c.departamentos || DEPARTAMENTOS_PADRAO).join('\n')} onChange={(e) => setC({ ...c, departamentos: e.target.value.split('\n') })} />
           </Field>
         </Card>
 

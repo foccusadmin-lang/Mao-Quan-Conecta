@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useDB, situacaoAluno, frequencia, professorEmDia } from '../../lib/db';
+import { useDB, situacaoAluno, frequencia, professorEmDia, responsaveisFilial } from '../../lib/db';
 import { brl, fmtDate, todayISO, monthISO } from '../../lib/utils';
 import { PageHead, Stat, Card, Empty, Faixa, Avatar } from '../../components/ui';
 import { SponsorShare, InvestButton } from '../../components/shared';
@@ -18,6 +18,7 @@ export default function ProfDashboard({ user }) {
       </>
     );
 
+  const meusDeps = responsaveisFilial(filial).find((r) => r.professorId === user.id)?.departamentos || [];
   const alunos = db.alunos.filter((a) => a.filialId === filial.id && a.status === 'aprovado');
   const pendentes = db.alunos.filter((a) => a.filialId === filial.id && a.status === 'pendente');
   const bloqueados = alunos.filter((a) => situacaoAluno(db, a).bloqueado);
@@ -29,7 +30,7 @@ export default function ProfDashboard({ user }) {
 
   return (
     <>
-      <PageHead title={`Olá, ${user.titulo} ${user.nome.split(' ')[0]}`} sub={`Unidade: ${filial.nome} · Mensalidade ${brl(filial.mensalidade)}`}>
+      <PageHead title={`Olá, ${user.titulo} ${user.nome.split(' ')[0]}`} sub={`Unidade: ${filial.nome}${meusDeps.length ? ` · Departamentos: ${meusDeps.join(", ")}` : ""} · Mensalidade ${brl(filial.mensalidade)}`}>
         <SponsorShare nome={`${user.titulo} ${user.nome}`} />
       </PageHead>
 
