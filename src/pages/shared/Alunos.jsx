@@ -152,18 +152,32 @@ function AlunoModal({ id, user, onClose, ask }) {
   const [promo, setPromo] = useState(null);
   const isAdmin = user.role === 'admin';
   if (!a) return null;
+  // Graduação manual: Central ou o professor responsável pela filial do aluno
+  const podeGraduar = isAdmin || (user.role === 'professor' && db.filiais.find((x) => x.id === a.filialId)?.professorId === user.id);
   const fin = situacaoAluno(db, a);
   const fr = frequencia(db, a);
 
-  const salvar = () => {
+  const gravar = () => {
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === id);
       const antes = x.atleta?.ativo;
-      Object.assign(x, { ...f, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao });
+      const faixaAntes = x.faixaIdx;
+      const novaFaixa = podeGraduar ? f.faixaIdx : faixaAntes;
+      Object.assign(x, { ...f, faixaIdx: novaFaixa, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao });
+      if (novaFaixa !== faixaAntes) {
+        x.historicoGraduacao = [...(x.historicoGraduacao || []), { data: todayISO(), faixaIdx: novaFaixa, de: faixaAntes, por: user.nome, manual: true }];
+        x.inscritoExame = false;
+        notify(d, id, 'Graduação atualizada 🎖️', `Sua graduação agora é ${faixaNome(d, novaFaixa)}.`);
+        if (!isAdmin) notify(d, 'admin', 'Graduação alterada pelo professor', `${x.nome}: ${faixaNome(d, faixaAntes)} → ${faixaNome(d, novaFaixa)} (por ${user.titulo || ''} ${user.nome}, ${filialNome(d, x.filialId)}).`);
+      }
       if (!antes && f.atleta?.ativo) notify(d, id, 'Você foi convocado(a) como Atleta 🏆', `Polo: ${f.atleta.polo || '—'}. Acesse a aba Atleta e assine o termo.`);
     });
     toast('Aluno salvo.');
   };
+  const salvar = () =>
+    podeGraduar && f.faixaIdx !== a.faixaIdx
+      ? ask(`Alterar a graduação de ${a.nome} de ${faixaNome(db, a.faixaIdx)} para ${faixaNome(db, f.faixaIdx)}? A alteração fica registrada no histórico.`, gravar, 'Alterar graduação')
+      : gravar();
   const addNota = () => {
     if (!nota.obs.trim()) return toast('Escreva uma observação.');
     setDB((d) => d.alunos.find((y) => y.id === id).tecnico.unshift({ ...nota, data: new Date().toISOString(), autor: user.nome }));
@@ -207,8 +221,8 @@ function AlunoModal({ id, user, onClose, ask }) {
                 </select>
               </Field>
             )}
-            <Field label="Graduação atual" hint={isAdmin ? '' : 'Alterada via aprovação de exame'}>
-              <select value={f.faixaIdx} disabled={!isAdmin} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
+            <Field label="Graduação atual" hint={isAdmin ? '' : podeGraduar ? 'Alteração manual — fica registrada no histórico do aluno' : 'Somente o professor responsável pela filial ou a Central pode alterar'}>
+              <select value={f.faixaIdx} disabled={!podeGraduar} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
                 <FaixaOptions />
               </select>
             </Field>
@@ -340,7 +354,7 @@ function AlunoModal({ id, user, onClose, ask }) {
           ))}
           {a.historicoGraduacao?.length > 0 && (
             <Card title="🎖️ Histórico de graduações">
-              {a.historicoGraduacao.map((h, i) => <div key={i} className="small">{fmtDate(h.data)} — {faixaNome(db, h.faixaIdx)}</div>)}
+              {a.historicoGraduacao.map((h, i) => <div key={i} className="small">{fmtDate(h.data)} — {faixaNome(db, h.faixaIdx)}{h.manual ? ` · alteração manual${h.por ? ` por ${h.por}` : ''}` : h.por ? ` · aprovada por ${h.por}` : ''}</div>)}
             </Card>
           )}
         </div>
