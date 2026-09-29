@@ -134,7 +134,7 @@ export default function Config() {
           <Field label="Polos de atleta (um por linha)" style={{ marginTop: 14 }}>
             <textarea rows={3} value={c.polos.join('\n')} onChange={(e) => setC({ ...c, polos: e.target.value.split('\n') })} />
           </Field>
-          <Field label="Departamentos / modalidades das filiais (um por linha)" hint="Usados para definir a área de cada professor responsável em Filiais">
+          <Field label="Modalidades das filiais (uma por linha)" hint="Usadas para definir a área de cada professor responsável em Filiais">
             <textarea rows={4} value={(c.departamentos || DEPARTAMENTOS_PADRAO).join('\n')} onChange={(e) => setC({ ...c, departamentos: e.target.value.split('\n') })} />
           </Field>
         </Card>

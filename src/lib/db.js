@@ -396,7 +396,7 @@ export const faixaNivel = (db, idx) => db.config.faixas[idx]?.nivel || '—';
 export const filialNome = (db, id) => db.filiais.find((f) => f.id === id)?.nome || '—';
 
 // ---------- Professores responsáveis pela filial ----------
-export const DEPARTAMENTOS_PADRAO = ['Tradicional', 'Esportivo', 'Sanda', 'Taichi'];
+export const DEPARTAMENTOS_PADRAO = ['Geral', 'Tradicional', 'Esportivo', 'Sanda', 'Tai Chi Chuan'];
 export const departamentos = (db) => (db.config.departamentos || DEPARTAMENTOS_PADRAO).map((x) => x.trim()).filter(Boolean);
 
 /**

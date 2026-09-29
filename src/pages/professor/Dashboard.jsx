@@ -30,7 +30,7 @@ export default function ProfDashboard({ user }) {
 
   return (
     <>
-      <PageHead title={`Olá, ${user.titulo} ${user.nome.split(' ')[0]}`} sub={`Unidade: ${filial.nome}${meusDeps.length ? ` · Departamentos: ${meusDeps.join(", ")}` : ""} · Mensalidade ${brl(filial.mensalidade)}`}>
+      <PageHead title={`Olá, ${user.titulo} ${user.nome.split(' ')[0]}`} sub={`Unidade: ${filial.nome}${meusDeps.length ? ` · Modalidades: ${meusDeps.join(", ")}` : ""} · Mensalidade ${brl(filial.mensalidade)}`}>
         <SponsorShare nome={`${user.titulo} ${user.nome}`} />
       </PageHead>
 

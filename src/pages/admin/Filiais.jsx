@@ -124,7 +124,7 @@ export default function Filiais() {
             <div className="card" style={{ background: '#faf8f6' }}>
               <b>🥋 Professores responsáveis</b>
               <p className="xs muted" style={{ margin: '4px 0 10px' }}>
-                Marque os departamentos (modalidades) de cada um. O marcado em <b>💸 Recebe mensalidades</b> é o responsável principal: as mensalidades dos alunos vão para a chave PIX dele.
+                Marque as modalidades de cada um (Geral, Tradicional, Esportivo, Sanda, Tai Chi Chuan…). O marcado em <b>💸 Recebe mensalidades</b> é o responsável principal: as mensalidades dos alunos vão para a chave PIX dele.
               </p>
               {edit.equipe.length === 0 && <p className="small muted">Nenhum responsável definido.</p>}
               {edit.equipe.map((r, i) => {
@@ -151,7 +151,7 @@ export default function Filiais() {
                       </button>
                     </div>
                     <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                      <span className="xs muted">Departamentos:</span>
+                      <span className="xs muted">Modalidades:</span>
                       {deps.map((dep) => {
                         const on = (r.departamentos || []).includes(dep);
                         return (
