@@ -1,8 +1,8 @@
 ﻿import { useState } from 'react';
 import { useDB, setDB, replaceDB, DEPARTAMENTOS_PADRAO } from '../../lib/db';
-import { uid } from '../../lib/utils';
+import { uid, brl } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo } from '../../components/ui';
-import { FAIXAS_PADRAO, NIVEIS } from '../../lib/seed';
+import { FAIXAS_PADRAO, NIVEIS, TAXAS_EXAME_2026 } from '../../lib/seed';
 import { PixBox } from '../../components/shared';
 
 export default function Config() {
@@ -57,7 +57,7 @@ export default function Config() {
             <Field label="Dia de vencimento"><Inp obj={c} set={setC} k="diaVencimento" type="number" min="1" max="28" /></Field>
             <Field label="Lembrete (dias antes)"><Inp obj={c} set={setC} k="lembreteDiasAntes" type="number" min="0" /></Field>
             <Field label="Tolerância até bloqueio (dias)" hint="Após isso: bloqueio de material e de exames"><Inp obj={c} set={setC} k="diasTolerancia" type="number" min="0" /></Field>
-            <Field label="Taxa de exame (R$)"><Inp obj={c} set={setC} k="taxaExame" type="number" min="0" /></Field>
+            <Field label="Taxa de exame padrão (R$)" hint="Para faixas sem valor na tabela de exame"><Inp obj={c} set={setC} k="taxaExame" type="number" min="0" /></Field>
             <Field label="Renovação da filiação (dias antes)" hint="Novo ciclo anual gerado automaticamente"><Inp obj={c} set={setC} k="renovacaoDiasAntes" type="number" min="0" /></Field>
           </div>
           <div className="xs muted" style={{ fontWeight: 700, margin: '14px 0 6px' }}>FILIAÇÃO ANUAL DO PROFESSOR</div>
@@ -137,6 +137,31 @@ export default function Config() {
           <Field label="Modalidades das filiais (uma por linha)" hint="Usadas para definir a área de cada professor responsável em Filiais">
             <textarea rows={4} value={(c.departamentos || DEPARTAMENTOS_PADRAO).join('\n')} onChange={(e) => setC({ ...c, departamentos: e.target.value.split('\n') })} />
           </Field>
+        </Card>
+
+        <Card title="🎖️ Taxa de exame de faixa">
+          <p className="xs muted" style={{ marginTop: 0 }}>Valor cobrado no exame para conquistar cada faixa. Faixas sem valor usam a taxa padrão ({brl(+c.taxaExame || 0)}).</p>
+          {c.faixas.map((f, i) => {
+            if (i === 0) return null;
+            const tabela = c.taxasExame || TAXAS_EXAME_2026;
+            return (
+              <div key={i} className="row mb" style={{ gap: 8, flexWrap: 'nowrap' }}>
+                <span className="faixa"><i style={{ background: faixaFundo(f), width: 34, height: 12 }} /></span>
+                <span className="grow small" style={{ fontWeight: 600 }}>{f.nome}</span>
+                <span className="small muted">R$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={tabela[f.nome] ?? ''}
+                  placeholder={String(+c.taxaExame || 0)}
+                  onChange={(e) => setC({ ...c, taxasExame: { ...tabela, [f.nome]: e.target.value === '' ? undefined : +e.target.value } })}
+                  style={{ width: 110 }}
+                />
+              </div>
+            );
+          })}
+          <button className="btn sm ghost" onClick={() => ask('Restaurar a tabela de exame de faixa 2026?', () => setC({ ...c, taxasExame: { ...TAXAS_EXAME_2026 } }), 'Restaurar')}>↺ Tabela oficial 2026</button>
         </Card>
 
         <Card title="🗂️ Tabela de valores e pacotes">

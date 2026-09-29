@@ -26,6 +26,21 @@ export const FAIXAS_PADRAO = [
   fx('Professor', 'Preta (Hanzi Branco)', COR.preta, { hanzi: '#ffffff' }),
 ];
 export const IDX_PRIMEIRA_PRETA = FAIXAS_PADRAO.findIndex((f) => f.nivel === 'Professor');
+// Taxa de exame por faixa a conquistar — tabela oficial Mao Chuen 2026 (editável em Configurações)
+export const TAXAS_EXAME_2026 = {
+  Branca: 80,
+  'Branca Ponta Cinza': 90,
+  Cinza: 100,
+  'Cinza Ponta Amarela': 110,
+  Amarela: 130,
+  'Amarela Ponta Verde': 140,
+  Verde: 150,
+  'Verde Ponta Azul': 170,
+  Azul: 190,
+  'Azul Ponta Vermelha': 210,
+  Vermelha: 230,
+  'Vermelha Ponta Preta': 250,
+};
 // Conversão do sistema antigo (9 faixas) para o oficial
 export const MAPA_FAIXAS_ANTIGAS = [1, 5, 5, 7, 9, 9, 11, 11, 13];
 

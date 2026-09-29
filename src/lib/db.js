@@ -4,7 +4,7 @@
 // ficam no banco: o aluno só recebe os próprios dados, o professor os da filial, o admin tudo.
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
-import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA } from './seed';
+import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026 } from './seed';
 import { valorPlano, resumoPlano, temPlanos } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
@@ -394,6 +394,12 @@ export function promoverAProfessor(db, alunoId, { titulo = 'Laoshi', filialId, r
 // ---------- Regras de negócio ----------
 export const faixaNome = (db, idx) => db.config.faixas[idx]?.nome || '—';
 export const faixaNivel = (db, idx) => db.config.faixas[idx]?.nivel || '—';
+/** Taxa do exame para conquistar a faixa `idx` (tabela por faixa; sem valor na tabela, usa a taxa padrão) */
+export const taxasExame = (db) => db.config.taxasExame || TAXAS_EXAME_2026;
+export function taxaExameFaixa(db, idx) {
+  const v = taxasExame(db)[db.config.faixas[idx]?.nome];
+  return v != null && v !== '' ? +v : +db.config.taxaExame || 0;
+}
 export const filialNome = (db, id) => db.filiais.find((f) => f.id === id)?.nome || '—';
 
 // ---------- Professores responsáveis pela filial ----------

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome } from '../../lib/db';
-import { uid, todayISO, addDays, fmtDate } from '../../lib/utils';
+import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, taxaExameFaixa } from '../../lib/db';
+import { uid, todayISO, addDays, fmtDate, brl } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty } from '../../components/ui';
 
 export default function Graduacao({ user }) {
@@ -24,7 +24,7 @@ export default function Graduacao({ user }) {
     setDB((d) => {
       d.pagamentos.push({
         id: uid('pg'), tipo: 'exame', pessoaId: a.id, filialId: a.filialId, competencia: todayISO().slice(0, 7),
-        descricao: `Taxa de exame — ${d.config.faixas[a.faixaIdx + 1]?.nome || 'graduação'}`, valor: d.config.taxaExame,
+        descricao: `Taxa de exame — ${d.config.faixas[a.faixaIdx + 1]?.nome || 'graduação'}`, valor: taxaExameFaixa(d, a.faixaIdx + 1),
         vencimento: addDays(todayISO(), 7), status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
       });
       notify(d, a.id, 'Taxa de exame gerada', 'Acesse Pagamentos para quitar a taxa e confirmar sua inscrição no exame.');
@@ -78,7 +78,7 @@ export default function Graduacao({ user }) {
                   <button className="btn sm ok" disabled={bloqueios.length > 0} onClick={() => avaliar(a, 'apto')}>Apto</button>
                   <button className="btn sm ghost" onClick={() => avaliar(a, 'reforco')}>Necessita reforço</button>
                   {a.preExame?.status === 'apto' && !taxa && !a.inscritoExame && bloqueios.length === 0 && (
-                    <button className="btn sm dark" onClick={() => gerarTaxa(a)}>Gerar taxa</button>
+                    <button className="btn sm dark" onClick={() => gerarTaxa(a)}>Gerar taxa · {brl(taxaExameFaixa(db, a.faixaIdx + 1))}</button>
                   )}
                   {taxa && <span className="badge warn">Taxa pendente</span>}
                   {!isAdmin && (
