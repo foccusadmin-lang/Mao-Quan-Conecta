@@ -36,6 +36,8 @@ export const NAVS = {
     ['carteira', '🪪', 'Minha Carteirinha'],
     ['filiacao', '🏅', 'Filiação'],
     ['plano', '📋', 'Meu Plano'],
+    ['atleta', '🏆', 'Atleta'],
+    ['dados', '📝', 'Meus Dados'],
   ],
   aluno: [
     ['', '🏠', 'Início'],
@@ -49,7 +51,7 @@ export const NAVS = {
     ['diretoria', '🏛️', 'Diretoria'],
     ['plano', '📋', 'Meu Plano'],
     ['pagamentos', '💳', 'Pagamentos'],
-    ['perfil', '👤', 'Meu Perfil'],
+    ['perfil', '📝', 'Meus Dados'],
   ],
 };
 
@@ -61,7 +63,9 @@ export default function Layout({ user }) {
   const [bell, setBell] = useState(false);
   const loc = useLocation();
   const base = '/' + user.role;
-  const nav = NAVS[user.role].filter(([p]) => !(p === 'atleta' && !user.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
+  // Professor também pode ser atleta: vale a ficha de praticante (mesmo e-mail)
+  const praticante = user.role === 'professor' ? db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase()) : user;
+  const nav = NAVS[user.role].filter(([p]) => !(p === 'atleta' && !praticante?.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
   const EXTRAS = { carreira: 'Construir Carreira' };
   const extra = EXTRAS[loc.pathname.split('/')[2]];
   const current = nav.find(([p]) => loc.pathname === (p ? `${base}/${p}` : base)) || (extra ? ['', '', extra] : nav[0]);

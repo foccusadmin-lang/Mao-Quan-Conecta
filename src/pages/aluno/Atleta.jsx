@@ -4,7 +4,7 @@ import { useDB, setDB, notify } from '../../lib/db';
 import { fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, toast, Empty } from '../../components/ui';
 
-export default function Atleta({ user }) {
+export default function Atleta({ user, base = "/aluno" }) {
   const db = useDB();
   const [ok, setOk] = useState(false);
   if (!user.atleta?.ativo) return <Empty icon="🏆">Área exclusiva para atletas convocados.</Empty>;
@@ -22,9 +22,9 @@ export default function Atleta({ user }) {
   return (
     <>
       <PageHead title="Página do Atleta" sub={`Polo: ${polo}`}>
-        <Link to="/aluno/carreira" className="btn gold">🏅 Construir Carreira</Link>
+        <Link to={`${base}/carreira`} className="btn gold">🏅 Construir Carreira</Link>
       </PageHead>
-      <Link to="/aluno/carreira" className="card mb" style={{ display: 'block', textDecoration: 'none', color: 'inherit', background: 'linear-gradient(135deg, #141414, #9e0c13)', borderColor: 'transparent' }}>
+      <Link to={`${base}/carreira`} className="card mb" style={{ display: 'block', textDecoration: 'none', color: 'inherit', background: 'linear-gradient(135deg, #141414, #9e0c13)', borderColor: 'transparent' }}>
         <div className="row" style={{ color: '#fff' }}>
           <span style={{ fontSize: 34 }}>🏅</span>
           <div className="grow">

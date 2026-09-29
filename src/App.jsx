@@ -33,6 +33,7 @@ import Estudo from './pages/professor/Estudo';
 import Filiacao from './pages/professor/Filiacao';
 import ProfCarteira from './pages/professor/Carteira';
 import ProfMeuPlano from './pages/professor/MeuPlano';
+import ProfMeusDados from './pages/professor/MeusDados';
 
 import AlunoGate from './pages/aluno/Gate';
 import AlunoHome from './pages/aluno/Home';
@@ -127,6 +128,9 @@ export default function App() {
             {temRecurso(user, 'carteira') && <Route path="carteira" element={<ProfCarteira user={user} />} />}
             {temRecurso(user, 'filiacao') && <Route path="filiacao" element={<Filiacao user={user} />} />}
             <Route path="plano" element={<ProfMeuPlano user={user} />} />
+            <Route path="dados" element={<ProfMeusDados user={user} />} />
+            <Route path="atleta" element={<ComoPraticante user={user}>{(pr) => <Atleta user={pr} base="/professor" />}</ComoPraticante>} />
+            <Route path="carreira" element={<ComoPraticante user={user}>{(pr) => <Carreira user={pr} base="/professor" />}</ComoPraticante>} />
           </Route>
         )}
 
@@ -171,4 +175,16 @@ function TelaStatus({ titulo, texto, sair, recarregar }) {
       </div>
     </div>
   );
+}
+/** Professor que também é atleta: as telas de atleta usam a ficha de praticante (mesmo e-mail Google) */
+function ComoPraticante({ user, children }) {
+  const db = useDB();
+  const pr = db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase());
+  if (!pr?.atleta?.ativo)
+    return (
+      <div className="alert gold">
+        🏆 A área de atleta é liberada pela Central. Para isso, você precisa ter a matrícula de praticante (menu Meu Plano) e ser convocado como atleta na sua ficha.
+      </div>
+    );
+  return children(pr);
 }

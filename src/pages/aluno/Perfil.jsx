@@ -1,34 +1,45 @@
-﻿import { useState } from 'react';
-import { useDB, setDB, setSession, filialNome } from '../../lib/db';
-import { fmtDate, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
-import { PageHead, Card, Field, Inp, PhotoInput, toast } from '../../components/ui';
+import { useState } from 'react';
+import { useDB, setDB, setSession, filialNome, notify } from '../../lib/db';
+import { fmtDate, maskTelefone } from '../../lib/utils';
+import { PageHead, Card, Field, Inp, toast } from '../../components/ui';
+import { CamposDadosPessoais, alteracoesImportantes, validarDados, enderecoVazio } from '../../components/DadosPessoais';
 
 export default function Perfil({ user }) {
   const db = useDB();
-  const [f, setF] = useState(() => ({ foto: user.foto, telefone: user.telefone, nascimento: user.nascimento, rg: user.rg || '', cpf: user.cpf || '', responsavel: user.responsavel, saude: { ...user.saude } }));
+  const [f, setF] = useState(() => ({
+    nome: user.nome || '', foto: user.foto, telefone: user.telefone || '', nascimento: user.nascimento || '', rg: user.rg || '', cpf: user.cpf || '',
+    endereco: { ...enderecoVazio(), ...(user.endereco || {}) }, responsavel: user.responsavel || '', saude: { ...user.saude },
+  }));
+
   const salvar = () => {
-    setDB((d) => Object.assign(d.alunos.find((a) => a.id === user.id), f));
-    toast('Perfil atualizado.');
+    const erro = validarDados(f);
+    if (erro) return toast(erro);
+    const dados = { ...f, nome: f.nome.trim().replace(/\s+/g, ' ') };
+    const mudou = alteracoesImportantes(user, dados);
+    setDB((d) => {
+      Object.assign(d.alunos.find((a) => a.id === user.id), dados);
+      if (mudou.length) {
+        const msg = `${dados.nome} atualizou: ${mudou.join(', ')}.`;
+        notify(d, 'admin', 'Aluno atualizou o cadastro', msg);
+        if (user.filialId) notify(d, 'filial:' + user.filialId, 'Aluno atualizou o cadastro', msg);
+      }
+    });
+    toast('Dados atualizados.');
   };
+
   return (
     <>
-      <PageHead title="Meu Perfil" sub={`${user.email} · ${filialNome(db, user.filialId)} · Matrícula ${user.matricula}`}>
+      <PageHead title="Meus Dados" sub={`${filialNome(db, user.filialId)} · Matrícula ${user.matricula}`}>
         <button className="btn ghost" onClick={() => setSession(null)}>Sair</button>
         <button className="btn" onClick={salvar}>Salvar</button>
       </PageHead>
       <div className="grid g2">
-        <Card title="Dados pessoais">
-          <div className="col">
-            <PhotoInput value={f.foto} name={user.nome} onChange={(v) => setF({ ...f, foto: v })} />
-            <div className="form-grid">
-              <Field label="WhatsApp"><Inp obj={f} set={setF} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
-              <Field label="Nascimento"><Inp obj={f} set={setF} k="nascimento" type="date" /></Field>
-              <Field label="RG"><input value={maskRG(f.rg || '')} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
-              <Field label="CPF"><input value={maskCPF(f.cpf || '')} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
-              <Field label="Responsável"><Inp obj={f} set={setF} k="responsavel" /></Field>
-            </div>
-            <div className="xs muted">Termos assinados em {fmtDate(user.termos?.data)} como “{user.termos?.assinatura}”.</div>
+        <Card title="📝 Dados cadastrais">
+          <CamposDadosPessoais f={f} setF={setF} email={user.email} />
+          <div className="form-grid mt">
+            <Field label="Responsável (se menor de idade)" style={{ gridColumn: '1/-1' }}><Inp obj={f} set={setF} k="responsavel" /></Field>
           </div>
+          {user.termos?.data && <div className="xs muted mt">Termos assinados em {fmtDate(user.termos.data)} como “{user.termos.assinatura}”.</div>}
         </Card>
         <Card title="⚕️ Ficha de saúde">
           <div className="form-grid">
@@ -42,6 +53,7 @@ export default function Perfil({ user }) {
           </div>
         </Card>
       </div>
+      <div className="mt"><button className="btn" onClick={salvar}>Salvar alterações</button></div>
     </>
   );
 }

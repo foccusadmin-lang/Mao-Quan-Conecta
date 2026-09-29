@@ -18,7 +18,7 @@ const TABS = [
   ['publicar', '🌐 Publicar'],
 ];
 
-export default function Carreira({ user }) {
+export default function Carreira({ user, base = "/aluno" }) {
   const db = useDB();
   const [ask, confirmEl] = useConfirm();
   const [tab, setTab] = useState('perfil');
@@ -114,7 +114,7 @@ export default function Carreira({ user }) {
   return (
     <>
       <PageHead title="Construir Carreira" sub="Monte seu portfólio de atleta e divulgue para conquistar patrocínios">
-        <Link to="/aluno/atleta" className="btn ghost">← Voltar</Link>
+        <Link to={`${base}/atleta`} className="btn ghost">← Voltar</Link>
         {existe && publicado && <a className="btn ghost" href={url} target="_blank" rel="noreferrer">👁 Ver vitrine</a>}
         <button className="btn" disabled={salvando} onClick={() => salvar()}>{salvando ? 'Salvando…' : alterado ? '💾 Salvar alterações' : '💾 Salvar'}</button>
       </PageHead>

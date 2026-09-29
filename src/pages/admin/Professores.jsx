@@ -144,6 +144,37 @@ export default function Professores() {
               <button type="button" className="btn sm ghost" onClick={() => setEdit({ ...edit, filiacaoValidaAte: addDays(todayISO(), 30) })}>+30 dias</button>
               <button type="button" className="btn sm ghost" onClick={() => setEdit({ ...edit, filiacaoValidaAte: addDays(todayISO(), 365) })}>+1 ano</button>
             </div>
+            {edit.id && (() => {
+              const pr = db.alunos.find((a) => (a.email || '').toLowerCase() === (edit.email || '').toLowerCase());
+              const liberar = (ativo, polo) =>
+                setDB((d) => {
+                  const x = d.alunos.find((a) => a.id === pr.id);
+                  x.atleta = { ...(x.atleta || {}), ativo, polo: polo ?? x.atleta?.polo ?? '' };
+                  if (ativo && !pr.atleta?.ativo) notify(d, edit.id, 'Você foi liberado(a) como Atleta 🏆', 'O menu Atleta já aparece no seu painel: monte seu perfil em Construir Carreira.');
+                });
+              return (
+                <div className="card" style={{ background: '#faf8f6' }}>
+                  <b>🏆 Atleta</b>
+                  {!pr ? (
+                    <p className="xs muted" style={{ margin: '4px 0 0' }}>Este professor ainda não tem matrícula de praticante. Ele ativa em <b>Meu Plano</b>; depois a liberação de atleta aparece aqui.</p>
+                  ) : (
+                    <div className="col" style={{ marginTop: 6 }}>
+                      <label className="check">
+                        <input type="checkbox" checked={!!pr.atleta?.ativo} onChange={(e) => (liberar(e.target.checked), toast(e.target.checked ? 'Liberado como atleta.' : 'Área de atleta desativada.'))} /> Liberado como atleta (menu Atleta e Construir Carreira no painel dele)
+                      </label>
+                      {pr.atleta?.ativo && (
+                        <Field label="Polo / Equipe">
+                          <select value={pr.atleta.polo || ''} onChange={(e) => liberar(true, e.target.value)}>
+                            <option value="">Selecione…</option>
+                            {db.config.polos.filter(Boolean).map((p) => <option key={p}>{p}</option>)}
+                          </select>
+                        </Field>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div className="card" style={{ background: '#faf8f6' }}>
               <b>💸 Chave PIX para receber as mensalidades da filial</b>
               <p className="xs muted" style={{ margin: '4px 0 10px' }}>Usada quando este professor é o responsável pela filial. O próprio professor também pode alterar no painel dele.</p>
