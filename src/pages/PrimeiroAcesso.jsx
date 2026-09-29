@@ -2,6 +2,9 @@
 import { useDB, useAuth, setDB, setSession, novoAluno, flush, recarregar } from '../lib/db';
 import { Field, toast, Avatar } from '../components/ui';
 import { maskCPF, maskRG, maskTelefone } from '../lib/utils';
+import { supabase } from '../lib/supabase';
+import { temPlanos, validarPlano } from '../lib/planos';
+import { EscolhaPlano } from '../components/Planos';
 
 /** Conta Google ainda não cadastrada: formulário de solicitação de filiação */
 export default function PrimeiroAcesso() {
@@ -9,13 +12,22 @@ export default function PrimeiroAcesso() {
   const auth = useAuth();
   const [enviando, setEnviando] = useState(false);
   const [f, setF] = useState({ nome: auth.nome || '', telefone: '', nascimento: '', rg: '', cpf: '', filialId: '', responsavel: '' });
+  const [plano, setPlano] = useState({ tipo: 'modalidades', modalidades: [] });
+  const filialSel = db.filiais.find((x) => x.id === f.filialId);
 
   const enviar = async () => {
     if (!f.nome.trim() || !f.telefone.trim() || !f.filialId) return toast('Preencha nome, WhatsApp e filial.');
+    const filial = db.filiais.find((x) => x.id === f.filialId);
+    const erroPlano = validarPlano(filial, plano);
+    if (erroPlano) return toast(erroPlano);
     setEnviando(true);
     try {
-      setDB((d) => void novoAluno(d, { ...f, nome: f.nome.trim(), email: auth.email, foto: auth.foto || null }));
+      let id;
+      const dados = { ...f, nome: f.nome.trim(), email: auth.email, foto: auth.foto || null };
+      if (temPlanos(filial)) dados.plano = { ...plano, atualizadoEm: new Date().toISOString() };
+      setDB((d) => void (id = novoAluno(d, dados).id));
       await flush();
+      if (dados.plano?.tipo === 'familia') await supabase.rpc('mq_aplicar_familia', { p_titular: id });
       await recarregar();
     } catch (e) {
       toast('Não foi possível enviar: ' + e.message);
@@ -52,6 +64,12 @@ export default function PrimeiroAcesso() {
           </Field>
           <Field label="Responsável (se menor de idade)" style={{ gridColumn: '1/-1' }}><input value={f.responsavel} onChange={(e) => setF({ ...f, responsavel: e.target.value })} /></Field>
         </div>
+        {filialSel && temPlanos(filialSel) && (
+          <div className="mt">
+            <h3 style={{ margin: '0 0 8px' }}>📋 Escolha seu plano</h3>
+            <EscolhaPlano filial={filialSel} value={plano} onChange={setPlano} />
+          </div>
+        )}
         <div className="row between mt">
           <button className="btn ghost" onClick={() => setSession(null)}>Usar outra conta</button>
           <button className="btn" disabled={enviando} onClick={enviar}>{enviando ? 'Enviando…' : 'Enviar cadastro'}</button>

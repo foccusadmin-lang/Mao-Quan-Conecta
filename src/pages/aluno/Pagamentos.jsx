@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useDB, situacaoAluno } from '../../lib/db';
 import { brl, fmtDate, todayISO } from '../../lib/utils';
@@ -14,7 +15,8 @@ export default function Pagamentos({ user }) {
   return (
     <>
       <PageHead title="Pagamentos" sub="PIX, cartão (InfinitePay) e envio de comprovante" />
-      {user.isento && <div className="alert gold mb">🎓 Você é isento(a) de mensalidade.</div>}
+      {user.isento && <div className="alert gold mb">{user.isentoPor ? `👨‍👩‍👧 ${user.isentoMotivo || 'Plano família'} — você está isento(a) da mensalidade.` : '🎓 Você é isento(a) de mensalidade.'}</div>}
+      {!user.isento && <Link to="/aluno/plano" className="alert ink mb" style={{ textDecoration: 'none' }}>📋 <div className="grow">Escolha ou altere suas modalidades, o pacote completo ou o plano família.</div> Meu Plano →</Link>}
       {fin.bloqueado && <div className="alert red mb">⛔ Existem mensalidades vencidas. Conteúdo, certificados e carteirinha ficam bloqueados até a confirmação.</div>}
 
       <div className="grid g2">

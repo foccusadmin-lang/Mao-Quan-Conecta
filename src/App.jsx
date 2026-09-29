@@ -40,6 +40,7 @@ import Conteudo from './pages/aluno/Conteudo';
 import AlunoPresenca from './pages/aluno/Presenca';
 import Atleta from './pages/aluno/Atleta';
 import Pagamentos from './pages/aluno/Pagamentos';
+import MeuPlano from './pages/aluno/MeuPlano';
 import Perfil from './pages/aluno/Perfil';
 import { Institucional, DiretoriaList } from './components/shared';
 import { PageHead } from './components/ui';
@@ -140,6 +141,7 @@ export default function App() {
               <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
               <Route path="institucional" element={<><PageHead title="Institucional" sub="Linhagem, história e o código de ética Wu De" /><Institucional /></>} />
               <Route path="diretoria" element={<><PageHead title="Diretoria 2025" sub="Diretores em atuação na vigência atual" /><DiretoriaList /></>} />
+              <Route path="plano" element={<MeuPlano user={user} />} />
               <Route path="pagamentos" element={<Pagamentos user={user} />} />
               <Route path="perfil" element={<Perfil user={user} />} />
             </Route>

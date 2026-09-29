@@ -3,6 +3,8 @@ import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, faixaNome,
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
+import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
+import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 
 export default function Alunos({ user }) {
   const db = useDB();
@@ -92,7 +94,7 @@ export default function Alunos({ user }) {
                       <td><Faixa idx={a.faixaIdx} /></td>
                       <td className="hide-sm">{fr ? <span className={`badge ${fr.ok ? 'ok' : 'red'}`}>{fr.pct}%</span> : '—'}</td>
                       <td>
-                        {a.status === 'aprovado' && !a.ultimoAcesso && !a.termos ? <span className="badge" title="Acesso liberado — ainda não entrou no app">⏳ Aguardando 1º acesso</span> : a.status !== 'aprovado' ? <StatusBadge status={a.status} /> : a.isento ? <span className="badge gold">Isento</span> : fin.bloqueado ? <span className="badge red">Bloqueado</span> : <span className="badge ok">Em dia</span>}
+                        {a.status === 'aprovado' && !a.ultimoAcesso && !a.termos ? <span className="badge" title="Acesso liberado — ainda não entrou no app">⏳ Aguardando 1º acesso</span> : a.status !== 'aprovado' ? <StatusBadge status={a.status} /> : a.isento ? <span className="badge gold" title={a.isentoMotivo || ""}>{a.isentoPor ? "👨‍👩‍👧 Família" : "Isento"}</span> : fin.bloqueado ? <span className="badge red">Bloqueado</span> : <span className="badge ok">Em dia</span>}
                       </td>
                       <td className="nowrap">
                         {a.status === 'pendente' && (
@@ -208,7 +210,9 @@ function AlunoModal({ id, user, onClose, ask }) {
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === id);
       const antes = x.atleta?.ativo;
-      Object.assign(x, { ...f, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame });
+      Object.assign(x, { ...f, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
+      if (!x.plano) delete x.plano;
+      if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
       if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
       if (!antes && f.atleta?.ativo) notify(d, id, 'Você foi convocado(a) como Atleta 🏆', `Polo: ${f.atleta.polo || '—'}. Acesse a aba Atleta e assine o termo.`);
     });
@@ -240,7 +244,7 @@ function AlunoModal({ id, user, onClose, ask }) {
         </>
       }
     >
-      <Tabs tabs={[['cadastro', 'Cadastro'], ['saude', '⚕️ Prontuário médico'], ['tecnico', '🥋 Evolução técnica (Wu De)'], ['frequencia', '✅ Frequência'], ['financeiro', '💳 Financeiro'], ['ficha', '📄 Ficha A4']]} value={tab} onChange={setTab} />
+      <Tabs tabs={[['cadastro', 'Cadastro'], ['saude', '⚕️ Prontuário médico'], ['tecnico', '🥋 Evolução técnica (Wu De)'], ['frequencia', '✅ Frequência'], ['plano', '📋 Plano'], ['financeiro', '💳 Financeiro'], ['ficha', '📄 Ficha A4']]} value={tab} onChange={setTab} />
 
       {tab === 'cadastro' && (
         <div className="col">
@@ -277,7 +281,7 @@ function AlunoModal({ id, user, onClose, ask }) {
           </div>
           <div className="card" style={{ background: '#faf8f6' }}>
             <div className="col">
-              <label className="check"><Inp obj={f} set={setF} k="isento" type="checkbox" /> Isento de mensalidade (bolsista)</label>
+              {a.isentoPor ? <div className="small">👨‍👩‍👧 {a.isentoMotivo || "Isento pelo plano família"}</div> : <label className="check"><Inp obj={f} set={setF} k="isento" type="checkbox" /> Isento de mensalidade (bolsista)</label>}
               <label className="check"><Inp obj={f} set={setF} k="atleta.ativo" type="checkbox" /> Promover a Atleta de Competição</label>
               {f.atleta?.ativo && (
                 <Field label="Polo / Equipe">
@@ -413,6 +417,8 @@ function AlunoModal({ id, user, onClose, ask }) {
         </div>
       )}
 
+      {tab === 'plano' && <PlanoDoAluno a={a} />}
+
       {tab === 'financeiro' && (
         <div className="col">
           <div className={`alert ${fin.bloqueado ? 'red' : 'ok'}`}>{a.isento ? '🎓 Aluno isento de mensalidade.' : fin.bloqueado ? '⛔ Bloqueado por inadimplência: material didático e exames suspensos.' : '✅ Situação financeira regular.'}</div>
@@ -495,6 +501,49 @@ function FichaA4({ a, fr }) {
         <div className="center" style={{ borderTop: '1px solid #000', width: '45%', paddingTop: 4 }}>Assinatura do aluno/responsável</div>
         <div className="center" style={{ borderTop: '1px solid #000', width: '45%', paddingTop: 4 }}>Laoshi responsável</div>
       </div>
+    </div>
+  );
+}
+
+/** Plano do aluno visto pelo professor/Central: modalidades, pacote ou família */
+function PlanoDoAluno({ a }) {
+  const db = useDB();
+  const filial = db.filiais.find((f) => f.id === a.filialId);
+  const [plano, setPlano] = useState(a.plano || null);
+  const [salvando, setSalvando] = useState(false);
+  if (!filial) return <Empty icon="🏯">Aluno sem filial.</Empty>;
+  if (a.isentoPor) {
+    const tit = db.alunos.find((x) => x.id === a.isentoPor);
+    return <div className="alert ok">👨‍👩‍👧 {a.isentoMotivo || 'Plano família'}.{tit && <> Titular: <b>{tit.nome}</b> ({tit.email}).</>} Isento da mensalidade.</div>;
+  }
+  const beneficiados = db.alunos.filter((x) => x.isentoPor === a.id);
+
+  const salvar = async () => {
+    const erro = validarPlano(filial, plano);
+    if (erro) return toast(erro);
+    setSalvando(true);
+    try {
+      await salvarPlanoAluno(a.id, plano);
+      toast('Plano do aluno salvo.');
+    } catch (e) {
+      toast('Não foi possível salvar: ' + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="col">
+      {a.plano && temPlanos(filial) && (
+        <div className="alert ink">Plano atual: <b>{resumoPlano(filial, a.plano)}</b> · {brl(valorPlano(filial, a.plano))}/mês</div>
+      )}
+      <EscolhaPlano filial={filial} value={plano} onChange={setPlano} />
+      {temPlanos(filial) && <div><button className="btn" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar plano'}</button></div>}
+      {beneficiados.length > 0 && (
+        <Card title="👨‍👩‍👧 Beneficiários isentos por este plano">
+          {beneficiados.map((b) => <div key={b.id} className="list-item"><Avatar src={b.foto} name={b.nome} /><div className="grow">{b.nome}<div className="xs muted">{b.email}</div></div><span className="badge gold">Isento</span></div>)}
+        </Card>
+      )}
     </div>
   );
 }

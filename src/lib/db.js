@@ -5,6 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA } from './seed';
+import { valorPlano, resumoPlano, temPlanos } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
 const COLECOES = ['filiais', 'professores', 'alunos', 'pagamentos', 'presencas', 'materiais', 'eventos', 'comunicados', 'notificacoes'];
@@ -473,7 +474,7 @@ export function rotinaFinanceira() {
       const fil = draft.filiais.find((f) => f.id === a.filialId);
       draft.pagamentos.push({
         id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,
-        descricao: `Mensalidade ${comp}`, valor: fil?.mensalidade ?? 0, vencimento: `${comp}-${dia}`,
+        descricao: `Mensalidade ${comp}${temPlanos(fil) && a.plano ? ` — ${resumoPlano(fil, a.plano)}` : ""}`, valor: valorPlano(fil, a.plano), vencimento: `${comp}-${dia}`,
         status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
       });
       mudou = true;

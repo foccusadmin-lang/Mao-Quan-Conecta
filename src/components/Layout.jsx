@@ -46,6 +46,7 @@ export const NAVS = {
     ['atleta', '🏆', 'Atleta'],
     ['institucional', '📜', 'Institucional'],
     ['diretoria', '🏛️', 'Diretoria'],
+    ['plano', '📋', 'Meu Plano'],
     ['pagamentos', '💳', 'Pagamentos'],
     ['perfil', '👤', 'Meu Perfil'],
   ],

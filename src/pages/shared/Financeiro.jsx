@@ -3,6 +3,7 @@ import { useDB, setDB, notify, confirmarPagamento, rotinaFinanceira, situacaoAlu
 import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays, maskChavePix } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Search, useConfirm } from '../../components/ui';
 import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
+import { PlanosFilialEditor } from '../../components/Planos';
 
 const TIPO = { mensalidade: 'Mensalidade', filiacao: 'Filiação', exame: 'Taxa de exame', manutencao: 'Manutenção', outro: 'Outro' };
 
@@ -71,7 +72,7 @@ export default function Financeiro({ user }) {
       </div>
 
       <Tabs
-        tabs={[...(isAdmin ? [['resumo', 'Resumo por filial']] : []), ['abertos', `Em aberto (${abertos.length})`], ['pagos', 'Recebidos'], ['isencoes', 'Isenções'], ...(isAdmin ? [['professores', 'Filiação professores'], ['pix', 'PIX / QR Code']] : [])]}
+        tabs={[...(isAdmin ? [['resumo', 'Resumo por filial']] : []), ['abertos', `Em aberto (${abertos.length})`], ['pagos', 'Recebidos'], ['isencoes', 'Isenções'], ['planos', '📋 Planos e valores'], ...(isAdmin ? [['professores', 'Filiação professores'], ['pix', 'PIX / QR Code']] : [])]}
         value={tab}
         onChange={setTab}
       />
@@ -193,14 +194,21 @@ export default function Financeiro({ user }) {
         <Card title="Isenções individuais">
           {alunosEscopo.map((a) => (
             <label key={a.id} className="list-item check">
-              <input type="checkbox" checked={!!a.isento} onChange={(e) => setDB((d) => { const x = d.alunos.find((y) => y.id === a.id); x.isento = e.target.checked; if (e.target.checked) notify(d, a.id, 'Isenção concedida', 'Você está isento(a) da mensalidade.'); })} />
-              <div className="grow">{a.nome}<div className="xs muted">{filialNome(db, a.filialId)}</div></div>
-              {a.isento && <span className="badge gold">Isento</span>}
+              <input type="checkbox" checked={!!a.isento} disabled={!!a.isentoPor} onChange={(e) => setDB((d) => { const x = d.alunos.find((y) => y.id === a.id); x.isento = e.target.checked; if (e.target.checked) notify(d, a.id, 'Isenção concedida', 'Você está isento(a) da mensalidade.'); })} />
+              <div className="grow">{a.nome}<div className="xs muted">{filialNome(db, a.filialId)}{a.isentoPor ? ` · ${a.isentoMotivo || 'Plano família'}` : ''}</div></div>
+              {a.isento && <span className="badge gold">{a.isentoPor ? '👨‍👩‍👧 Família' : 'Isento'}</span>}
             </label>
           ))}
           {alunosEscopo.length === 0 && <Empty>Nenhum aluno.</Empty>}
         </Card>
       )}
+
+      {tab === 'planos' &&
+        (filial ? (
+          <PlanosFilialEditor key={filial} filial={db.filiais.find((x) => x.id === filial)} />
+        ) : (
+          <Card><Empty icon="🏯">Selecione uma filial no seletor acima para configurar as modalidades, o pacote e os combos família.</Empty></Card>
+        ))}
 
       {tab === 'professores' && isAdmin && (
         <Card title="Filiação anual dos professores (à vista, 3x ou 6x)">
