@@ -100,27 +100,204 @@ export function Avatar({ src, name, size = '' }) {
   return <span className={`avatar ${size}`}>{initials(name)}</span>;
 }
 
+/** Foto de perfil: câmera ou galeria, com recorte e reposicionamento antes de salvar */
 export function PhotoInput({ value, onChange, name }) {
+  const [original, setOriginal] = useState(null); // imagem escolhida, aguardando recorte
+  const [camera, setCamera] = useState(false);
+  const toque = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+  const podeWebcam = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
+
+  const escolher = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      setOriginal(await readImage(f, 1600, 0.92));
+    } catch {
+      toast('Não foi possível abrir essa imagem. Tente outra (JPG ou PNG).');
+    }
+  };
+
   return (
     <div className="row">
       <Avatar src={value} name={name} size="lg" />
       <div className="col" style={{ gap: 6 }}>
-        <label className="btn ghost sm">
-          📷 Enviar foto
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (f) onChange(await readImage(f, 500));
-              e.target.value = '';
-            }}
-          />
-        </label>
-        {value && <button type="button" className="btn link sm" onClick={() => onChange(null)}>Remover</button>}
+        <div className="row" style={{ gap: 6 }}>
+          {toque || !podeWebcam ? (
+            <label className="btn ghost sm">
+              📸 Câmera
+              <input type="file" accept="image/*" capture="user" hidden onChange={escolher} />
+            </label>
+          ) : (
+            <button type="button" className="btn ghost sm" onClick={() => setCamera(true)}>📸 Câmera</button>
+          )}
+          <label className="btn ghost sm">
+            🖼️ Galeria
+            <input type="file" accept="image/*" hidden onChange={escolher} />
+          </label>
+        </div>
+        <div className="row" style={{ gap: 6 }}>
+          {value && <button type="button" className="btn link sm" onClick={() => setOriginal(value)}>✂️ Ajustar</button>}
+          {value && <button type="button" className="btn link sm" onClick={() => onChange(null)}>Remover</button>}
+        </div>
       </div>
+      {camera && <CameraFoto onFoto={(src) => (setCamera(false), setOriginal(src))} onClose={() => setCamera(false)} />}
+      {original && <RecorteFoto src={original} onPronto={(src) => (onChange(src), setOriginal(null))} onClose={() => setOriginal(null)} />}
     </div>
+  );
+}
+
+/** Webcam no computador (no celular a câmera nativa abre pelo próprio seletor) */
+function CameraFoto({ onFoto, onClose }) {
+  const [erro, setErro] = useState('');
+  const [video, setVideo] = useState(null);
+  useEffect(() => {
+    if (!video) return;
+    let stream;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
+      .then((s) => {
+        stream = s;
+        video.srcObject = s;
+        video.play().catch(() => {});
+      })
+      .catch(() => setErro('Não foi possível acessar a câmera. Verifique a permissão do navegador ou use a Galeria.'));
+    return () => stream?.getTracks().forEach((t) => t.stop());
+  }, [video]);
+
+  const capturar = () => {
+    if (!video?.videoWidth) return;
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width, 0); // espelhado, como o usuário se vê
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    onFoto(c.toDataURL('image/jpeg', 0.92));
+  };
+
+  return (
+    <Modal open onClose={onClose} title="📸 Tirar foto" footer={<button className="btn" disabled={!!erro} onClick={capturar}>Capturar</button>}>
+      {erro ? (
+        <div className="alert red small">{erro}</div>
+      ) : (
+        <video ref={setVideo} playsInline muted style={{ width: '100%', borderRadius: 12, background: '#000', transform: 'scaleX(-1)' }} />
+      )}
+    </Modal>
+  );
+}
+
+const V = 280; // tamanho da área de recorte na tela
+const SAIDA = 500; // tamanho da foto salva
+
+/** Recorte quadrado (exibido em círculo): arrastar para reposicionar, zoom por barra, pinça ou roda do mouse */
+function RecorteFoto({ src, onPronto, onClose }) {
+  const [img, setImg] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const toques = useState(() => new Map())[0];
+  const gesto = useState(() => ({}))[0];
+
+  useEffect(() => {
+    const i = new Image();
+    i.onload = () => setImg(i);
+    i.src = src;
+  }, [src]);
+
+  const base = img ? V / Math.min(img.width, img.height) : 1;
+  const escala = base * zoom;
+  const limitar = (p, z = zoom) => {
+    if (!img) return p;
+    const s = base * z;
+    const mx = Math.max(0, (img.width * s - V) / 2);
+    const my = Math.max(0, (img.height * s - V) / 2);
+    return { x: Math.min(mx, Math.max(-mx, p.x)), y: Math.min(my, Math.max(-my, p.y)) };
+  };
+  const mudarZoom = (z) => {
+    const nz = Math.min(4, Math.max(1, z));
+    setZoom(nz);
+    setPos((p) => limitar(p, nz));
+  };
+
+  const down = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    toques.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (toques.size === 2) {
+      const [a, b] = [...toques.values()];
+      gesto.dist = Math.hypot(a.x - b.x, a.y - b.y);
+      gesto.zoom = zoom;
+    }
+  };
+  const move = (e) => {
+    const antes = toques.get(e.pointerId);
+    if (!antes) return;
+    const agora = { x: e.clientX, y: e.clientY };
+    toques.set(e.pointerId, agora);
+    if (toques.size === 2 && gesto.dist) {
+      const [a, b] = [...toques.values()];
+      mudarZoom((gesto.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / gesto.dist);
+    } else if (toques.size === 1) {
+      setPos((p) => limitar({ x: p.x + agora.x - antes.x, y: p.y + agora.y - antes.y }));
+    }
+  };
+  const up = (e) => {
+    toques.delete(e.pointerId);
+    if (toques.size < 2) gesto.dist = 0;
+  };
+
+  const salvar = () => {
+    if (!img) return;
+    const c = document.createElement('canvas');
+    c.width = c.height = SAIDA;
+    const ctx = c.getContext('2d');
+    const k = SAIDA / V;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, SAIDA, SAIDA);
+    const w = img.width * escala * k;
+    const h = img.height * escala * k;
+    ctx.drawImage(img, SAIDA / 2 + pos.x * k - w / 2, SAIDA / 2 + pos.y * k - h / 2, w, h);
+    onPronto(c.toDataURL('image/jpeg', 0.88));
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="✂️ Ajustar foto"
+      footer={
+        <>
+          <button className="btn ghost" onClick={() => (setZoom(1), setPos({ x: 0, y: 0 }))}>Centralizar</button>
+          <button className="btn" onClick={salvar} disabled={!img}>Usar esta foto</button>
+        </>
+      }
+    >
+      <p className="xs muted center" style={{ marginTop: 0 }}>Arraste para reposicionar. Use a barra (ou dois dedos / roda do mouse) para aproximar.</p>
+      <div
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onWheel={(e) => mudarZoom(zoom * (e.deltaY < 0 ? 1.08 : 0.92))}
+        style={{ width: V, height: V, margin: '0 auto', position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#111', touchAction: 'none', cursor: 'grab', userSelect: 'none' }}
+      >
+        {img && (
+          <img
+            src={src}
+            alt=""
+            draggable={false}
+            style={{ position: 'absolute', left: '50%', top: '50%', width: img.width * escala, height: img.height * escala, maxWidth: 'none', transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`, pointerEvents: 'none' }}
+          />
+        )}
+        {/* máscara: mostra o círculo que aparece no perfil */}
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', boxShadow: '0 0 0 999px rgba(0,0,0,.55)', border: '2px solid rgba(255,255,255,.9)', pointerEvents: 'none' }} />
+      </div>
+      <div className="row mt" style={{ justifyContent: 'center', gap: 10 }}>
+        <span>➖</span>
+        <input type="range" min="1" max="4" step="0.01" value={zoom} onChange={(e) => mudarZoom(+e.target.value)} style={{ width: 200 }} aria-label="Zoom" />
+        <span>➕</span>
+      </div>
+    </Modal>
   );
 }
 
