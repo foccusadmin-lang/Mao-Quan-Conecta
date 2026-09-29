@@ -169,7 +169,7 @@ export default function Financeiro({ user }) {
                       <td className="nowrap">{brl(p.valor)}</td>
                       <td><StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} /></td>
                       <td className="nowrap">
-                        <button className={`btn sm ${p.analise === 'enviado' ? 'ok' : 'ghost'}`} title="Conferir comprovante e auditoria" onClick={() => setConferir(p.id)}>🔎 Conferir</button>{' '}
+                        <button className={`btn sm ${p.analise === 'enviado' ? 'ok' : 'ghost'}`} title="Conferir comprovante e auditoria" onClick={() => setConferir(p.id)}>{p.comprovantes?.length ? '👁 Ver comprovante' : '🔎 Conferir'}</button>{' '}
                         <button className="btn sm ok" onClick={() => confirmar(p, 'pix')}>✔ Confirmar</button>{' '}
                         <button className="btn sm ghost" title="Recebido em mãos" onClick={() => confirmar(p, 'dinheiro')}>💵</button>{' '}
                         <button className="btn sm ghost" title="Lembrete WhatsApp" onClick={() => lembrete(p)}>📲</button>{' '}
