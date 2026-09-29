@@ -1,15 +1,15 @@
 ﻿import { useState } from 'react';
 import { useDB, setDB, notify, confirmarPagamento, rotinaFinanceira, situacaoAluno, filialNome, professorEmDia, gerarFiliacao, planoFiliacao, descPlano } from '../../lib/db';
-import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays } from '../../lib/utils';
+import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays, maskChavePix } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Search, useConfirm } from '../../components/ui';
-import { PixBox } from '../../components/shared';
+import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
 
 const TIPO = { mensalidade: 'Mensalidade', filiacao: 'Filiação', exame: 'Taxa de exame', manutencao: 'Manutenção', outro: 'Outro' };
 
 export default function Financeiro({ user }) {
   const db = useDB();
   const isAdmin = user.role === 'admin';
-  const [tab, setTab] = useState('abertos');
+  const [tab, setTab] = useState(isAdmin ? 'resumo' : 'abertos');
   const [q, setQ] = useState('');
   const [mes, setMes] = useState(monthISO());
   const [filial, setFilial] = useState(isAdmin ? '' : user.filialId);
@@ -17,6 +17,7 @@ export default function Financeiro({ user }) {
   const [pix, setPix] = useState(null);
   const [ask, confirmEl] = useConfirm();
   const hoje = todayISO();
+  const { rec: recMinhaFilial } = useRecebedor(isAdmin ? null : user.filialId);
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial.</Empty>;
 
@@ -35,9 +36,14 @@ export default function Financeiro({ user }) {
       toast('Pagamento confirmado — acessos liberados.');
     });
 
+  const chaveLembrete = (p) => {
+    const rec = p.tipo === 'mensalidade' ? (isAdmin ? recebedorLocal(db, p.filialId) : recMinhaFilial) : null;
+    return rec ? `${maskChavePix(rec.tipo, rec.chave)} (${rec.titular || rec.nome})` : db.config.pixChave;
+  };
+
   const lembrete = (p) =>
     window.open(
-      waLink(telDe(p.pessoaId) ? '55' + telDe(p.pessoaId).replace(/\D/g, '') : db.config.whatsapp, `Olá, ${nomeDe(p.pessoaId)}! Lembrete da Associação Mao Quan: ${p.descricao} no valor de ${brl(p.valor)} ${p.vencimento < hoje ? 'venceu' : 'vence'} em ${fmtDate(p.vencimento)}. PIX: ${db.config.pixChave}`),
+      waLink(telDe(p.pessoaId) ? '55' + telDe(p.pessoaId).replace(/\D/g, '') : db.config.whatsapp, `Olá, ${nomeDe(p.pessoaId)}! Lembrete da Associação Mao Quan: ${p.descricao} no valor de ${brl(p.valor)} ${p.vencimento < hoje ? 'venceu' : 'vence'} em ${fmtDate(p.vencimento)}. PIX: ${chaveLembrete(p)}`),
       '_blank'
     );
 
@@ -65,10 +71,69 @@ export default function Financeiro({ user }) {
       </div>
 
       <Tabs
-        tabs={[['abertos', `Em aberto (${abertos.length})`], ['pagos', 'Recebidos'], ['isencoes', 'Isenções'], ...(isAdmin ? [['professores', 'Filiação professores'], ['pix', 'PIX / QR Code']] : [])]}
+        tabs={[...(isAdmin ? [['resumo', 'Resumo por filial']] : []), ['abertos', `Em aberto (${abertos.length})`], ['pagos', 'Recebidos'], ['isencoes', 'Isenções'], ...(isAdmin ? [['professores', 'Filiação professores'], ['pix', 'PIX / QR Code']] : [])]}
         value={tab}
         onChange={setTab}
       />
+
+      {tab === 'resumo' && isAdmin && (() => {
+        const soma = (l) => l.reduce((s, p) => s + +p.valor, 0);
+        const linhas = db.filiais.filter((f) => !filial || f.id === filial).map((f) => {
+          const pg = db.pagamentos.filter((p) => p.filialId === f.id);
+          const mens = pg.filter((p) => p.tipo === 'mensalidade');
+          const rec = recebedorLocal(db, f.id);
+          return {
+            f,
+            alunos: db.alunos.filter((a) => a.status === 'aprovado' && a.filialId === f.id).length,
+            previsto: soma(mens.filter((p) => (p.competencia || p.vencimento?.slice(0, 7)) === mes)),
+            recebidoMens: soma(mens.filter((p) => p.status === 'pago' && p.pagoEm?.startsWith(mes))),
+            recebidoOutros: soma(pg.filter((p) => p.tipo !== 'mensalidade' && p.status === 'pago' && p.pagoEm?.startsWith(mes))),
+            aberto: soma(pg.filter((p) => p.status === 'pendente')),
+            vencido: soma(pg.filter((p) => p.status === 'pendente' && p.vencimento < hoje)),
+            recebedor: rec ? `${rec.titulo || 'Laoshi'} ${rec.nome}` : null,
+          };
+        });
+        const tot = ['alunos', 'previsto', 'recebidoMens', 'recebidoOutros', 'aberto', 'vencido'].reduce((o, k) => ({ ...o, [k]: linhas.reduce((s, l) => s + l[k], 0) }), {});
+        return (
+          <Card title={`${filial ? filialNome(db, filial) : 'Todas as filiais'} · ${fmtMonth(mes)}`} actions={<input type="month" value={mes} onChange={(e) => setMes(e.target.value)} style={{ maxWidth: 180 }} />}>
+            <div className="grid g4 mb">
+              <Stat label="Mensalidades previstas" value={brl(tot.previsto)} icon="📅" tone="ink" hint={`${tot.alunos} alunos ativos`} />
+              <Stat label="Mensalidades recebidas" value={brl(tot.recebidoMens)} icon="💰" tone="ok" hint={tot.previsto ? `${Math.round((tot.recebidoMens / tot.previsto) * 100)}% do previsto` : ''} />
+              <Stat label="Filiação, exames e outros" value={brl(tot.recebidoOutros)} icon="🏅" tone="gold" hint="Recebidos no mês" />
+              <Stat label="Em aberto (total)" value={brl(tot.aberto)} icon="⛔" tone="red" hint={`${brl(tot.vencido)} vencido`} />
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Filial</th><th>Alunos</th><th>Previsto</th><th>Mensalidades recebidas</th><th>Outras receitas</th><th>Em aberto</th><th>Vencido</th><th>Mensalidade creditada a</th><th></th></tr></thead>
+                <tbody>
+                  {linhas.map((l) => (
+                    <tr key={l.f.id}>
+                      <td style={{ fontWeight: 600 }}>{l.f.nome}{!l.f.ativa && <div className="xs muted">Inativa</div>}</td>
+                      <td>{l.alunos}</td>
+                      <td className="nowrap">{brl(l.previsto)}</td>
+                      <td className="nowrap" style={{ color: 'var(--ok)', fontWeight: 700 }}>{brl(l.recebidoMens)}</td>
+                      <td className="nowrap">{brl(l.recebidoOutros)}</td>
+                      <td className="nowrap">{brl(l.aberto)}</td>
+                      <td className="nowrap" style={{ color: l.vencido ? 'var(--red)' : undefined }}>{brl(l.vencido)}</td>
+                      <td className="small">{l.recebedor ? <span className="badge ok">{l.recebedor}</span> : <span className="badge">Associação</span>}</td>
+                      <td>{!filial && <button className="btn sm ghost" onClick={() => setFilial(l.f.id)}>Detalhar</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {linhas.length > 1 && (
+                  <tfoot>
+                    <tr style={{ fontWeight: 800 }}>
+                      <td>Total geral</td><td>{tot.alunos}</td><td className="nowrap">{brl(tot.previsto)}</td><td className="nowrap">{brl(tot.recebidoMens)}</td><td className="nowrap">{brl(tot.recebidoOutros)}</td><td className="nowrap">{brl(tot.aberto)}</td><td className="nowrap">{brl(tot.vencido)}</td><td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+            {filial && <button className="btn sm ghost mt" onClick={() => setFilial('')}>← Ver todas as filiais</button>}
+            <p className="xs muted" style={{ marginBottom: 0 }}>Mensalidades são creditadas na chave PIX do professor responsável pela filial; sem chave cadastrada, vão para a Associação. Filiação e demais taxas vão sempre para a Associação.</p>
+          </Card>
+        );
+      })()}
 
       {tab === 'abertos' && (
         <Card>
@@ -188,7 +253,7 @@ export default function Financeiro({ user }) {
       )}
 
       <Modal open={!!pix} onClose={() => setPix(null)} title="Cobrança PIX">
-        {pix && <PixBox valor={pix.valor} descricao={pix.descricao} txid={pix.id} />}
+        {pix && <PixBox valor={pix.valor} descricao={pix.descricao} txid={pix.id} filialId={pix.tipo === 'mensalidade' ? pix.filialId : undefined} />}
       </Modal>
 
       <Modal

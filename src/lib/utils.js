@@ -151,3 +151,32 @@ export const APP_URL = (import.meta.env.VITE_APP_URL || (import.meta.env.PROD ? 
 // Google Maps: abre o endereço (no celular abre o app de mapas) e a rota até o local
 export const mapsBusca = (endereco) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
 export const mapsRota = (endereco) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(endereco)}`;
+
+// ---------- Chave PIX (professor) ----------
+export const TIPOS_PIX = { cpf: 'CPF / CNPJ', celular: 'Celular', email: 'E-mail', aleatoria: 'Chave aleatória' };
+export const maskCNPJ = (v = '') =>
+  v.replace(/\D/g, '').slice(0, 14).replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
+/** Máscara conforme o tipo da chave (para digitação e exibição) */
+export const maskChavePix = (tipo, v = '') => {
+  if (tipo === 'cpf') return v.replace(/\D/g, '').length > 11 ? maskCNPJ(v) : maskCPF(v);
+  if (tipo === 'celular') return maskTelefone(v);
+  if (tipo === 'email') return v.trim().toLowerCase();
+  return v.trim();
+};
+/** Chave no formato exigido pelo PIX (BR Code): CPF/CNPJ só dígitos, celular +55…, e-mail minúsculo */
+export const chavePixEMV = ({ tipo, chave = '' } = {}) => {
+  if (tipo === 'cpf') return chave.replace(/\D/g, '');
+  if (tipo === 'celular') return '+55' + chave.replace(/\D/g, '');
+  if (tipo === 'email' || tipo === 'aleatoria') return chave.trim().toLowerCase();
+  return chave.trim();
+};
+/** Retorna mensagem de erro, ou '' se a chave for válida */
+export const validarChavePix = ({ tipo, chave = '' } = {}) => {
+  const d = chave.replace(/\D/g, '');
+  if (!chave.trim()) return 'Informe a chave PIX.';
+  if (tipo === 'cpf' && d.length !== 11 && d.length !== 14) return 'CPF deve ter 11 dígitos (ou CNPJ 14).';
+  if (tipo === 'celular' && d.length !== 11) return 'Celular deve ter DDD + 9 dígitos.';
+  if (tipo === 'email' && !/^\S+@\S+\.\S+$/.test(chave.trim())) return 'E-mail inválido.';
+  if (tipo === 'aleatoria' && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chave.trim())) return 'Chave aleatória inválida (formato 00000000-0000-0000-0000-000000000000).';
+  return '';
+};

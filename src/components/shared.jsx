@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useDB } from '../lib/db';
-import { pixPayload, copy, brl, waLink, b64e, todayISO, APP_URL, mapsBusca, mapsRota } from '../lib/utils';
+import { supabase } from '../lib/supabase';
+import { pixPayload, chavePixEMV, maskChavePix, TIPOS_PIX, copy, brl, waLink, b64e, todayISO, APP_URL, mapsBusca, mapsRota } from '../lib/utils';
 import { Modal, toast, WAIcon, Card } from './ui';
 
 export function useQR(text, opts = {}) {
@@ -26,26 +27,69 @@ export function WhatsFab() {
 }
 
 // ---------- PIX ----------
-export function PixBox({ valor, descricao, txid }) {
+/** Professor responsável pela filial, se tiver chave PIX cadastrada (dados já carregados no app) */
+export function recebedorLocal(db, filialId) {
+  const f = db.filiais.find((x) => x.id === filialId);
+  const p = f?.professorId && db.professores.find((x) => x.id === f.professorId);
+  return p && p.ativo !== false && p.pix?.chave?.trim() ? { professorId: p.id, nome: p.nome, titulo: p.titulo, telefone: p.telefone, ...p.pix } : null;
+}
+
+/** Recebedor das mensalidades da filial. O aluno não lê o cadastro de professores, então consulta o servidor. */
+export function useRecebedor(filialId) {
   const db = useDB();
-  const payload = pixPayload({ chave: db.config.pixChave, nome: db.config.pixNome, cidade: db.config.pixCidade, valor, descricao, txid });
+  const local = filialId ? recebedorLocal(db, filialId) : null;
+  const [remoto, setRemoto] = useState({ filialId: null, rec: null });
+  useEffect(() => {
+    if (!filialId || local) return;
+    let vivo = true;
+    supabase.rpc('mq_recebedor_filial', { p_filial: filialId }).then(({ data }) => vivo && setRemoto({ filialId, rec: data || null }));
+    return () => (vivo = false);
+  }, [filialId, !!local]);
+  if (!filialId) return { carregando: false, rec: null };
+  if (local) return { carregando: false, rec: local };
+  return { carregando: remoto.filialId !== filialId, rec: remoto.filialId === filialId ? remoto.rec : null };
+}
+
+/**
+ * QR Code / copia e cola PIX.
+ * Com `filialId` (mensalidade), o valor vai para a chave do professor responsável pela filial;
+ * sem chave cadastrada, usa a chave da Associação.
+ */
+export function PixBox({ valor, descricao, txid, filialId }) {
+  const db = useDB();
+  const { carregando, rec } = useRecebedor(filialId);
+  const chave = rec ? chavePixEMV(rec) : db.config.pixChave;
+  const nome = rec ? rec.titular || rec.nome : db.config.pixNome;
+  const cidade = rec?.cidade || db.config.pixCidade;
+  const payload = carregando || !chave ? '' : pixPayload({ chave, nome, cidade, valor, descricao, txid });
   const qr = useQR(payload);
+  const telProf = (rec?.telefone || '').replace(/\D/g, '');
+  const whats = telProf.length >= 10 ? '55' + telProf : db.config.whatsapp;
+  if (carregando) return <div className="small muted center">Carregando dados do PIX…</div>;
   return (
     <div className="col" style={{ alignItems: 'center', textAlign: 'center' }}>
       {qr && <img src={qr} alt="QR Code PIX" style={{ width: 210, height: 210, borderRadius: 12, border: '1px solid var(--line)' }} />}
       {valor ? <div style={{ fontSize: 22, fontWeight: 800 }}>{brl(valor)}</div> : null}
-      <div className="small muted">
-        Chave PIX (e-mail): <b style={{ color: 'var(--ink)' }}>{db.config.pixChave}</b>
-      </div>
+      {rec ? (
+        <div className="small muted">
+          Recebedor: <b style={{ color: 'var(--ink)' }}>{rec.titulo || 'Laoshi'} {rec.nome}</b> (professor responsável pela filial)
+          <br />
+          Chave PIX ({TIPOS_PIX[rec.tipo] || 'chave'}): <b style={{ color: 'var(--ink)' }}>{maskChavePix(rec.tipo, rec.chave)}</b>
+        </div>
+      ) : (
+        <div className="small muted">
+          Chave PIX (e-mail): <b style={{ color: 'var(--ink)' }}>{db.config.pixChave}</b>
+        </div>
+      )}
       <div className="row" style={{ justifyContent: 'center' }}>
         <button className="btn dark sm" onClick={() => copy(payload).then(() => toast('PIX copia e cola copiado!'))}>📋 Copiar PIX copia e cola</button>
-        <button className="btn ghost sm" onClick={() => copy(db.config.pixChave).then(() => toast('Chave copiada!'))}>Copiar chave</button>
+        <button className="btn ghost sm" onClick={() => copy(chave).then(() => toast('Chave copiada!'))}>Copiar chave</button>
       </div>
-      {db.config.infinitePay && (
+      {!rec && db.config.infinitePay && (
         <a className="btn gold sm" href={db.config.infinitePay} target="_blank" rel="noreferrer">💳 Pagar com cartão (InfinitePay)</a>
       )}
-      <a className="btn ok sm" href={waLink(db.config.whatsapp, `Olá! Segue o comprovante de pagamento: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">
-        📎 Enviar comprovante via WhatsApp
+      <a className="btn ok sm" href={waLink(whats, `Olá! Segue o comprovante de pagamento: ${descricao || ''} ${valor ? brl(valor) : ''}`)} target="_blank" rel="noreferrer">
+        📎 Enviar comprovante via WhatsApp{telProf.length >= 10 ? ' ao professor' : ''}
       </a>
     </div>
   );

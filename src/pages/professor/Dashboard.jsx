@@ -3,6 +3,7 @@ import { useDB, situacaoAluno, frequencia, professorEmDia } from '../../lib/db';
 import { brl, fmtDate, todayISO, monthISO } from '../../lib/utils';
 import { PageHead, Stat, Card, Empty, Faixa, Avatar } from '../../components/ui';
 import { SponsorShare, InvestButton } from '../../components/shared';
+import { MinhaChavePix } from '../../components/ChavePix';
 
 export default function ProfDashboard({ user }) {
   const db = useDB();
@@ -31,6 +32,12 @@ export default function ProfDashboard({ user }) {
       <PageHead title={`Olá, ${user.titulo} ${user.nome.split(' ')[0]}`} sub={`Unidade: ${filial.nome} · Mensalidade ${brl(filial.mensalidade)}`}>
         <SponsorShare nome={`${user.titulo} ${user.nome}`} />
       </PageHead>
+
+      {filial.professorId === user.id && !db.professores.find((p) => p.id === user.id)?.pix?.chave && (
+        <a href="#chave-pix" onClick={(e) => (e.preventDefault(), document.getElementById('chave-pix')?.scrollIntoView({ behavior: 'smooth' }))} className="alert gold mb" style={{ textDecoration: 'none' }}>
+          💸 <div className="grow">Cadastre sua chave PIX para receber as mensalidades da filial direto na sua conta.</div> Cadastrar →
+        </a>
+      )}
 
       {!professorEmDia(user) && (
         <Link to="filiacao" className="alert red mb" style={{ textDecoration: 'none' }}>
@@ -68,6 +75,7 @@ export default function ProfDashboard({ user }) {
           ))}
         </Card>
       </div>
+      <div className="mt" id="chave-pix"><MinhaChavePix user={user} /></div>
       <div className="mt"><InvestButton /></div>
     </>
   );

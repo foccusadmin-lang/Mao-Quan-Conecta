@@ -3,6 +3,7 @@ import { IDX_PRIMEIRA_PRETA } from '../../lib/seed';
 import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso } from '../../lib/db';
 import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
+import { CamposChavePix, prepararPix, pixVazio } from '../../components/ChavePix';
 
 const TITULOS = ['Shifu', 'Laoshi', 'Jiǎngshī', 'Jiàoliàn', 'Zhùjiào'];
 const vazio = { nome: '', email: '', telefone: '', rg: '', cpf: '', nascimento: '', titulo: 'Laoshi', faixaIdx: IDX_PRIMEIRA_PRETA, filialId: '', foto: null, ativo: true, filiacaoValidaAte: '', obs: '', recursos: recursosPadrao() };
@@ -17,11 +18,21 @@ export default function Professores() {
     if (!edit.nome || !/^\S+@\S+\.\S+$/.test(edit.email)) return toast('Informe nome e e-mail válido.');
     const email = edit.email.trim().toLowerCase();
     if (db.professores.some((p) => p.email === email && p.id !== edit.id)) return toast('E-mail já cadastrado.');
+    let pix;
+    try {
+      pix = prepararPix(edit.pix);
+    } catch (e) {
+      return toast('Chave PIX: ' + e.message);
+    }
     setDB((d) => {
-      const data = { ...edit, email, filialId: edit.filialId || null };
+      const data = { ...edit, email, filialId: edit.filialId || null, pix };
+      if (!pix) delete data.pix;
       let id = edit.id;
-      if (id) Object.assign(d.professores.find((p) => p.id === id), data);
-      else {
+      if (id) {
+        const alvo = d.professores.find((p) => p.id === id);
+        Object.assign(alvo, data);
+        if (!pix) delete alvo.pix;
+      } else {
         id = uid('pr');
         d.professores.push({ ...data, id, criadoEm: new Date().toISOString() });
         notify(d, id, 'Acesso habilitado', 'Bem-vindo(a) ao painel do Laoshi!');
@@ -75,7 +86,13 @@ export default function Professores() {
                         </div>
                       </div>
                     </td>
-                    <td>{filialNome(db, p.filialId)}</td>
+                    <td>
+                      {filialNome(db, p.filialId)}
+                      <div className="xs">
+                        {db.filiais.some((f) => f.professorId === p.id) && <span className="badge gold" style={{ marginRight: 4 }}>Responsável</span>}
+                        {p.pix?.chave ? <span className="badge ok">PIX ✓</span> : <span className="badge">Sem PIX</span>}
+                      </div>
+                    </td>
                     <td><Faixa idx={p.faixaIdx} /></td>
                     <td>{professorEmDia(p) ? <span className="badge ok">até {fmtDate(p.filiacaoValidaAte)}</span> : <span className="badge red">Vencida</span>}</td>
                     <td><span className={`badge ${p.ativo ? 'ok' : ''}`}>{p.ativo ? 'Ativo' : 'Bloqueado'}</span><div className="xs muted">{RECURSOS_PROF.filter(([k]) => temRecurso(p, k)).length}/{RECURSOS_PROF.length} recursos</div></td>
@@ -126,6 +143,11 @@ export default function Professores() {
             <div className="row">
               <button type="button" className="btn sm ghost" onClick={() => setEdit({ ...edit, filiacaoValidaAte: addDays(todayISO(), 30) })}>+30 dias</button>
               <button type="button" className="btn sm ghost" onClick={() => setEdit({ ...edit, filiacaoValidaAte: addDays(todayISO(), 365) })}>+1 ano</button>
+            </div>
+            <div className="card" style={{ background: '#faf8f6' }}>
+              <b>💸 Chave PIX para receber as mensalidades da filial</b>
+              <p className="xs muted" style={{ margin: '4px 0 10px' }}>Usada quando este professor é o responsável pela filial. O próprio professor também pode alterar no painel dele.</p>
+              <CamposChavePix pix={edit.pix || pixVazio(edit.nome)} onChange={(pix) => setEdit({ ...edit, pix })} />
             </div>
             <Field label="Observações"><Inp obj={edit} set={setEdit} k="obs" type="textarea" /></Field>
             <div className="card" style={{ background: '#faf8f6' }}>

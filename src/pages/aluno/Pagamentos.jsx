@@ -33,7 +33,7 @@ export default function Pagamentos({ user }) {
           ))}
         </Card>
         <Card title="💳 Formas de pagamento">
-          <PixBox descricao="Mao Quan Kung Fu" />
+          <PixBox descricao="Mensalidade Mao Quan" filialId={user.filialId} />
         </Card>
       </div>
 
@@ -56,7 +56,7 @@ export default function Pagamentos({ user }) {
       <Modal open={!!pagar} onClose={() => setPagar(null)} title={pagar?.descricao}>
         {pagar && (
           <>
-            <PixBox valor={pagar.valor} descricao={pagar.descricao} txid={pagar.id} />
+            <PixBox valor={pagar.valor} descricao={pagar.descricao} txid={pagar.id} filialId={pagar.tipo === 'mensalidade' ? pagar.filialId || user.filialId : undefined} />
             <p className="xs muted center">Após o pagamento, envie o comprovante. A liberação acontece assim que o professor ou a Central confirmar.</p>
           </>
         )}
