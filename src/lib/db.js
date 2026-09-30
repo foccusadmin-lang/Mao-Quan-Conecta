@@ -507,7 +507,10 @@ export function modalidadesProfessor(db, prof) {
   // Na filial em que está trabalhando valem as modalidades marcadas na equipe dela; senão, as do cadastro
   const f = db.filiais.find((x) => x.id === prof?.filialId);
   const daEquipe = responsaveisFilial(f).find((r) => r.professorId === prof?.id)?.departamentos || [];
-  return daEquipe.length ? daEquipe : prof?.modalidades || [];
+  if (daEquipe.length) return daEquipe;
+  // O cadastro guarda as modalidades da filial principal; em outra filial sem marcação, não herda
+  const naPrincipal = !prof?.filialPrincipal || prof.filialPrincipal === prof.filialId;
+  return naPrincipal ? prof?.modalidades || [] : [];
 }
 
 /** Modalidades que o aluno pratica: as do plano escolhido + as que têm graduação (TCQ, Sanda…) */

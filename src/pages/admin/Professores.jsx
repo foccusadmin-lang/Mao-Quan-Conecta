@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { IDX_PRIMEIRA_PRETA } from '../../lib/seed';
-import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso, adicionarResponsavel, removerResponsavel, ehResponsavel, departamentos, modalidadesProfessor, responsaveisFilial } from '../../lib/db';
+import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso, adicionarResponsavel, removerResponsavel, ehResponsavel, departamentos, modalidadesProfessor, responsaveisFilial, filiaisDoProfessor } from '../../lib/db';
 import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { CamposChavePix, prepararPix, pixVazio } from '../../components/ChavePix';
@@ -14,6 +14,15 @@ export default function Professores() {
   const [q, setQ] = useState('');
   const [ask, confirmEl] = useConfirm();
 
+  /** Modalidades do professor em cada filial designada (vêm da equipe de responsáveis de cada filial) */
+  const modsPorFilialDe = (p) =>
+    Object.fromEntries(
+      filiaisDoProfessor(p).map((fid) => {
+        const r = responsaveisFilial(db.filiais.find((x) => x.id === fid)).find((x) => x.professorId === p.id);
+        return [fid, [...(r?.departamentos?.length ? r.departamentos : fid === p.filialId ? p.modalidades || [] : [])]];
+      })
+    );
+
   const salvar = () => {
     if (!edit.nome || !/^\S+@\S+\.\S+$/.test(edit.email)) return toast('Informe nome e e-mail válido.');
     const email = edit.email.trim().toLowerCase();
@@ -25,6 +34,8 @@ export default function Professores() {
       return toast('Chave PIX: ' + e.message);
     }
     const antesExtras = (edit.id && db.professores.find((p) => p.id === edit.id)?.filiaisExtras) || [];
+    const faltam = [edit.filialId, ...(edit.filiaisExtras || [])].filter((x, i) => i > 0 && !x);
+    if (faltam.length) return toast('Escolha a filial em cada “Outra filial designada” ou remova a linha vazia.');
     setDB((d) => {
       const data = { ...edit, email, filialId: edit.filialId || null, pix };
       if (!pix) delete data.pix;
@@ -46,21 +57,19 @@ export default function Professores() {
         d.professores.push({ ...data, id, criadoEm: new Date().toISOString() });
         notify(d, id, 'Acesso habilitado', 'Bem-vindo(a) ao painel do Laoshi!');
       }
-      if (data.filialId) {
-        const f = d.filiais.find((x) => x.id === data.filialId);
-        if (f && !f.professorId) adicionarResponsavel(f, id);
-        // Mantém as modalidades iguais na equipe de responsáveis da filial
-        if (f && ehResponsavel(f, id)) f.equipe = responsaveisFilial(f).map((r) => (r.professorId === id ? { ...r, departamentos: [...(data.modalidades || [])] } : r));
-      }
-      // Filiais adicionais: entra na equipe de responsáveis de cada uma; sai das que foram desmarcadas
+      // Filiais designadas: o professor entra na equipe de responsáveis de cada uma, com as modalidades daquela filial
       const extras = [...new Set((data.filiaisExtras || []).filter((x) => x && x !== data.filialId))];
       const alvo = d.professores.find((p) => p.id === id);
       alvo.filiaisExtras = extras;
       if (!extras.length) delete alvo.filiaisExtras;
+      const mods = edit.modsPorFilial || {};
+      alvo.modalidades = [...(mods[data.filialId] || [])]; // referência: modalidades na filial principal
+      delete alvo.modsPorFilial;
       for (const f of d.filiais) {
-        if (f.id === data.filialId) continue;
-        if (extras.includes(f.id)) adicionarResponsavel(f, id);
-        else if (antesExtras.includes(f.id)) removerResponsavel(f, id);
+        if (f.id === data.filialId || extras.includes(f.id)) {
+          adicionarResponsavel(f, id);
+          f.equipe = responsaveisFilial(f).map((r) => (r.professorId === id ? { ...r, departamentos: [...(mods[f.id] || [])] } : r));
+        } else if (antesExtras.includes(f.id)) removerResponsavel(f, id);
       }
     });
     setEdit(null);
@@ -119,7 +128,7 @@ export default function Professores() {
                     <td><span className={`badge ${p.ativo ? 'ok' : ''}`}>{p.ativo ? 'Ativo' : 'Bloqueado'}</span><div className="xs muted">{RECURSOS_PROF.filter(([k]) => temRecurso(p, k)).length}/{RECURSOS_PROF.length} recursos</div></td>
                     <td className="nowrap">
                       <button className="btn sm ghost" onClick={() => promover(p)} title="Propor/Aprovar graduação">🎖️</button>{' '}
-                      <button className="btn sm dark" onClick={() => setEdit({ ...vazio, ...p, modalidades: [...modalidadesProfessor(db, p)], filialId: p.filialId || '', recursos: { ...recursosPadrao(), ...p.recursos } })}>Editar</button>{' '}
+                      <button className="btn sm dark" onClick={() => setEdit({ ...vazio, ...p, modsPorFilial: modsPorFilialDe(p), filialId: p.filialId || '', recursos: { ...recursosPadrao(), ...p.recursos } })}>Editar</button>{' '}
                       <button className="btn sm ghost" onClick={() => ask(`Excluir ${p.nome}?`, () => setDB((d) => { d.professores = d.professores.filter((x) => x.id !== p.id); d.filiais.forEach((f) => removerResponsavel(f, p.id)); }), 'Excluir')}>🗑</button>
                     </td>
                   </tr>
@@ -151,26 +160,47 @@ export default function Professores() {
                   <FaixaOptions />
                 </select>
               </Field>
-              <Field label="Filial designada (principal)">
-                <select value={edit.filialId} onChange={(e) => setEdit({ ...edit, filialId: e.target.value, filiaisExtras: (edit.filiaisExtras || []).filter((x) => x !== e.target.value) })}>
-                  <option value="">— Nenhuma —</option>
-                  {db.filiais.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                </select>
-              </Field>
-              <div style={{ gridColumn: '1/-1' }}>
-                {(edit.filiaisExtras || []).map((fid, i) => {
-                  const usadas = [edit.filialId, ...(edit.filiaisExtras || []).filter((_, j) => j !== i)];
-                  const muda = (v) => setEdit({ ...edit, filiaisExtras: edit.filiaisExtras.map((x, j) => (j === i ? v : x)) });
+              <div className="card" style={{ gridColumn: '1/-1', background: '#faf8f6', padding: 12 }}>
+                <b className="small">🏯 Filiais designadas e modalidades</b>
+                <p className="xs muted" style={{ margin: '2px 0 10px' }}>
+                  Em cada filial, marque as modalidades pelas quais o professor responde. Ele vê só os alunos dessas modalidades naquela filial. <b>Geral</b> = todas as modalidades.
+                </p>
+                {[edit.filialId, ...(edit.filiaisExtras || [])].map((fid, i) => {
+                  const principal = i === 0;
+                  const usadas = [edit.filialId, ...(edit.filiaisExtras || [])].filter((_, j) => j !== i);
+                  const muda = (v) =>
+                    principal
+                      ? setEdit({ ...edit, filialId: v, filiaisExtras: (edit.filiaisExtras || []).filter((x) => x !== v), modsPorFilial: { ...edit.modsPorFilial, [v]: edit.modsPorFilial?.[fid] || [] } })
+                      : setEdit({ ...edit, filiaisExtras: edit.filiaisExtras.map((x, j) => (j === i - 1 ? v : x)), modsPorFilial: { ...edit.modsPorFilial, [v]: edit.modsPorFilial?.[fid] || [] } });
+                  const mods = edit.modsPorFilial?.[fid] || [];
+                  const alterna = (m) => setEdit({ ...edit, modsPorFilial: { ...edit.modsPorFilial, [fid]: mods.includes(m) ? mods.filter((x) => x !== m) : [...mods, m] } });
                   return (
-                    <Field key={i} label={`Outra filial designada ${i + 2}`}>
-                      <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
-                        <select value={fid} onChange={(e) => muda(e.target.value)} style={{ flex: 1 }}>
-                          <option value="">Selecione a filial…</option>
-                          {db.filiais.filter((f) => f.id === fid || !usadas.includes(f.id)).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-                        </select>
-                        <button type="button" className="btn sm ghost icon" aria-label="Remover esta filial" title="Remover esta filial" onClick={() => setEdit({ ...edit, filiaisExtras: edit.filiaisExtras.filter((_, j) => j !== i) })}>✕</button>
-                      </div>
-                    </Field>
+                    <div key={i} className="card" style={{ padding: 10, marginBottom: 8 }}>
+                      <Field label={principal ? 'Filial designada (principal)' : `Outra filial designada ${i + 1}`}>
+                        <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                          <select value={fid || ''} onChange={(e) => muda(e.target.value)} style={{ flex: 1 }}>
+                            <option value="">{principal ? '— Nenhuma —' : 'Selecione a filial…'}</option>
+                            {db.filiais.filter((f) => f.id === fid || !usadas.includes(f.id)).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                          </select>
+                          {!principal && (
+                            <button type="button" className="btn sm ghost icon" aria-label="Remover esta filial" title="Remover esta filial" onClick={() => setEdit({ ...edit, filiaisExtras: edit.filiaisExtras.filter((_, j) => j !== i - 1) })}>✕</button>
+                          )}
+                        </div>
+                      </Field>
+                      {fid && (
+                        <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                          <span className="xs muted">Modalidades nesta filial:</span>
+                          {departamentos(db).map((m) => {
+                            const on = mods.includes(m);
+                            return (
+                              <button key={m} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => alterna(m)}>
+                                {on ? '✓ ' : ''}{m}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 {edit.filialId && (
@@ -178,20 +208,8 @@ export default function Professores() {
                     + Adicionar outra filial designada
                   </button>
                 )}
-                <div className="xs muted" style={{ marginTop: 4 }}>O professor fica responsável por todas as filiais designadas. No painel dele, escolhe no topo em qual filial está trabalhando.</div>
+                <div className="xs muted" style={{ marginTop: 6 }}>O professor fica responsável por todas as filiais designadas. No painel dele, escolhe no topo em qual filial está trabalhando. Sem modalidade marcada numa filial, ele vê todos os alunos dela.</div>
               </div>
-              <Field label="Modalidades sob responsabilidade" style={{ gridColumn: '1/-1' }} hint="O professor vê só os alunos dessas modalidades na filial. “Geral” = responsável por todas as modalidades. Sem nenhuma marcada, vê todos os alunos da filial.">
-                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                  {departamentos(db).map((m) => {
-                    const on = (edit.modalidades || []).includes(m);
-                    return (
-                      <button key={m} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => setEdit({ ...edit, modalidades: on ? edit.modalidades.filter((x) => x !== m) : [...(edit.modalidades || []), m] })}>
-                        {on ? '✓ ' : ''}{m}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Field>
               <Field label="Filiação válida até" hint="Atualizada automaticamente ao confirmar o pagamento">
                 <Inp obj={edit} set={setEdit} k="filiacaoValidaAte" type="date" />
               </Field>
