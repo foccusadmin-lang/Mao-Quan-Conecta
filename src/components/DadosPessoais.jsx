@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { maskCPF, maskRG, maskTelefone } from '../lib/utils';
 import { Field, Inp, PhotoInput } from './ui';
 
@@ -21,9 +22,45 @@ export function validarDados(f) {
 }
 
 /** Nome, foto, contatos, documentos e endereço */
+/** Consulta o CEP no ViaCEP (serviço público). Retorna { logradouro, bairro, cidade, uf, complemento } ou null */
+export async function buscarCEP(cep) {
+  const d = cep.replace(/\D/g, '');
+  if (d.length !== 8) return null;
+  const r = await fetch(`https://viacep.com.br/ws/${d}/json/`);
+  if (!r.ok) throw new Error('Serviço de CEP indisponível');
+  const j = await r.json();
+  if (j.erro) return null;
+  return { logradouro: j.logradouro || '', bairro: j.bairro || '', cidade: j.localidade || '', uf: j.uf || '', complemento: j.complemento || '' };
+}
+
 export function CamposDadosPessoais({ f, setF, email }) {
   const end = f.endereco || enderecoVazio();
-  const mudaEnd = (patch) => setF({ ...f, endereco: { ...end, ...patch } });
+  const mudaEnd = (patch) => setF((atual) => ({ ...atual, endereco: { ...(atual.endereco || enderecoVazio()), ...patch } }));
+  const numeroRef = useRef(null);
+  const [cepStatus, setCepStatus] = useState(''); // '' | buscando | ok | nao | erro
+
+  const mudaCEP = async (valor) => {
+    const cep = maskCEP(valor);
+    mudaEnd({ cep });
+    if (cep.replace(/\D/g, '').length !== 8) return setCepStatus('');
+    setCepStatus('buscando');
+    try {
+      const achado = await buscarCEP(cep);
+      if (!achado) return setCepStatus('nao');
+      // Preenche rua, bairro, cidade e UF; número e complemento ficam para o usuário
+      setF((atual) => {
+        const e = atual.endereco || enderecoVazio();
+        if (e.cep !== cep) return atual; // CEP mudou enquanto buscava
+        return { ...atual, endereco: { ...e, logradouro: achado.logradouro, bairro: achado.bairro, cidade: achado.cidade, uf: achado.uf, complemento: e.complemento } };
+      });
+      setCepStatus('ok');
+      setTimeout(() => numeroRef.current?.focus(), 50);
+    } catch {
+      setCepStatus('erro');
+    }
+  };
+
+  const dicaCEP = { buscando: '🔎 Buscando endereço…', ok: '✅ Endereço preenchido — informe o número', nao: 'CEP não encontrado. Preencha o endereço manualmente.', erro: 'Não foi possível consultar o CEP agora. Preencha manualmente.' }[cepStatus];
   return (
     <div className="col">
       <PhotoInput value={f.foto} name={f.nome} onChange={(v) => setF({ ...f, foto: v })} />
@@ -37,9 +74,9 @@ export function CamposDadosPessoais({ f, setF, email }) {
       </div>
       <b className="small" style={{ marginTop: 6 }}>🏠 Endereço</b>
       <div className="form-grid">
-        <Field label="CEP"><input value={end.cep} inputMode="numeric" onChange={(e) => mudaEnd({ cep: maskCEP(e.target.value) })} placeholder="00000-000" maxLength={9} /></Field>
+        <Field label="CEP" hint={dicaCEP}><input value={end.cep} inputMode="numeric" onChange={(e) => mudaCEP(e.target.value)} placeholder="00000-000" maxLength={9} /></Field>
         <Field label="Rua / Avenida"><input value={end.logradouro} onChange={(e) => mudaEnd({ logradouro: e.target.value })} /></Field>
-        <Field label="Número"><input value={end.numero} onChange={(e) => mudaEnd({ numero: e.target.value })} /></Field>
+        <Field label="Número"><input ref={numeroRef} value={end.numero} onChange={(e) => mudaEnd({ numero: e.target.value })} placeholder="Nº da casa" /></Field>
         <Field label="Complemento"><input value={end.complemento} onChange={(e) => mudaEnd({ complemento: e.target.value })} /></Field>
         <Field label="Bairro"><input value={end.bairro} onChange={(e) => mudaEnd({ bairro: e.target.value })} /></Field>
         <Field label="Cidade"><input value={end.cidade} onChange={(e) => mudaEnd({ cidade: e.target.value })} /></Field>
