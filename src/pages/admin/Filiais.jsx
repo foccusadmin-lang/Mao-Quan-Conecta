@@ -134,7 +134,7 @@ export default function Filiais() {
             <div className="card" style={{ background: '#faf8f6' }}>
               <b>🥋 Professores responsáveis</b>
               <p className="xs muted" style={{ margin: '4px 0 10px' }}>
-                Marque as modalidades de cada um (Geral, Tradicional, Esportivo, Sanda, Tai Chi Chuan…). O marcado em <b>💸 Recebe mensalidades</b> é o responsável principal: as mensalidades dos alunos vão para a chave PIX dele.
+                Marque as modalidades de cada um (Geral, Tradicional, Esportivo, Sanda, Tai Chi Chuan…). <b>Geral</b> = responsável por todas as modalidades. O marcado em <b>💸 Recebe mensalidades</b> é o responsável principal: as mensalidades dos alunos vão para a chave PIX dele.
               </p>
               {edit.equipe.length === 0 && <p className="small muted">Nenhum responsável definido.</p>}
               {edit.equipe.map((r, i) => {

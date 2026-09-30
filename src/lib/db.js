@@ -517,14 +517,19 @@ export function modalidadesAluno(db, a) {
   return [...lista];
 }
 
+/** "Geral" = responsável por todas as modalidades da filial */
+export const MODALIDADE_GERAL = 'Geral';
+export const ehResponsavelGeral = (mods = []) => mods.includes(MODALIDADE_GERAL);
+
 /**
  * O professor só vê os alunos das modalidades pelas quais responde.
  * Sem modalidade definida (professor ou aluno), vale a filial inteira — ninguém some por falta de cadastro.
+ * Professor com "Geral" responde por todas as modalidades e vê a filial inteira.
  */
 export function professorVeAluno(db, user, a) {
   if (!a || user?.role !== 'professor') return true;
   const pm = modalidadesProfessor(db, user);
-  if (!pm.length) return true;
+  if (!pm.length || ehResponsavelGeral(pm)) return true;
   const am = modalidadesAluno(db, a);
   if (!am.length) return true;
   return am.some((m) => pm.includes(m));

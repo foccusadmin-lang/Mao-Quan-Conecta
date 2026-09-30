@@ -169,7 +169,7 @@ export default function Professores() {
                   })}
                 </div>
               </Field>
-              <Field label="Modalidades sob responsabilidade" style={{ gridColumn: '1/-1' }} hint="O professor vê só os alunos dessas modalidades na filial. Sem nenhuma marcada, vê todos os alunos da filial.">
+              <Field label="Modalidades sob responsabilidade" style={{ gridColumn: '1/-1' }} hint="O professor vê só os alunos dessas modalidades na filial. “Geral” = responsável por todas as modalidades. Sem nenhuma marcada, vê todos os alunos da filial.">
                 <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                   {departamentos(db).map((m) => {
                     const on = (edit.modalidades || []).includes(m);
