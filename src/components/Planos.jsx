@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB, flush, departamentos } from '../lib/db';
+import { useDB, setDB, flush, departamentos, notify, mensalidadeDoAluno } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { brl } from '../lib/utils';
+import { brl, monthISO } from '../lib/utils';
 import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor } from '../lib/planos';
 import { Card, Field, toast } from './ui';
 
@@ -210,4 +210,100 @@ export async function salvarPlanoAluno(alunoId, plano) {
     });
   }
   return data || [];
+}
+
+// ---------------------------------------------------------------------------
+// Dia de vencimento escolhido pelo aluno (1 a 28)
+// ---------------------------------------------------------------------------
+export function DiaVencimento({ aluno }) {
+  const db = useDB();
+  const padrao = db.config.diaVencimento || 10;
+  const escolher = (v) => {
+    setDB((d) => {
+      const x = d.alunos.find((y) => y.id === aluno.id);
+      if (!x) return;
+      if (v === '') delete x.diaVencimento;
+      else x.diaVencimento = +v;
+    });
+    toast(v === '' ? `Vencimento no dia padrão (${padrao}).` : `Vencimento no dia ${v}. Vale a partir da próxima mensalidade.`);
+  };
+  return (
+    <Card title="📅 Dia de vencimento da mensalidade">
+      <Field label="Vencer todo dia" hint="Vale a partir da próxima mensalidade gerada. Cobranças já emitidas mantêm o vencimento.">
+        <select value={aluno.diaVencimento ?? ''} onChange={(e) => escolher(e.target.value)} style={{ maxWidth: 260 }}>
+          <option value="">Padrão da Associação (dia {padrao})</option>
+          {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>Dia {d}</option>)}
+        </select>
+      </Field>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Professor / Central: mensalidade padrão ou personalizada (desconto, benefício…)
+// ---------------------------------------------------------------------------
+export function ValorMensalidade({ aluno, user }) {
+  const db = useDB();
+  const m = mensalidadeDoAluno(db, aluno);
+  const [modo, setModo] = useState(m.personalizada ? 'personalizada' : 'padrao');
+  const [valor, setValor] = useState(m.personalizada ? String(m.valor) : '');
+  const [motivo, setMotivo] = useState(m.motivo || '');
+  const [aplicarAberta, setAplicarAberta] = useState(true);
+  const comp = monthISO();
+  const aberta = db.pagamentos.find((p) => p.pessoaId === aluno.id && p.tipo === 'mensalidade' && p.competencia === comp && p.status === 'pendente' && !p.comprovantes?.length);
+
+  const salvar = () => {
+    const personalizada = modo === 'personalizada';
+    if (personalizada && (valor === '' || !(+valor >= 0))) return toast('Informe o valor personalizado.');
+    if (personalizada && !motivo.trim()) return toast('Informe o motivo (ex.: bolsa parcial, benefício social).');
+    const novo = personalizada ? +(+valor).toFixed(2) : m.padrao;
+    const agora = new Date().toISOString();
+    setDB((d) => {
+      const x = d.alunos.find((y) => y.id === aluno.id);
+      if (personalizada) x.mensalidadePersonalizada = { valor: novo, motivo: motivo.trim(), por: user.nome, em: agora };
+      else delete x.mensalidadePersonalizada;
+      x.historicoMensalidade = [...(x.historicoMensalidade || []), { em: agora, por: user.nome, valor: novo, padrao: m.padrao, personalizada, motivo: personalizada ? motivo.trim() : 'Voltou ao valor padrão' }];
+      if (aplicarAberta && aberta) {
+        const p = d.pagamentos.find((y) => y.id === aberta.id);
+        if (p && p.status === 'pendente') {
+          p.valor = novo;
+          if (personalizada) Object.assign(p, { personalizada: true, valorPadrao: m.padrao });
+          else (delete p.personalizada, delete p.valorPadrao);
+          p.auditoria = [...(p.auditoria || []), { em: agora, por: user.nome, acao: 'valor_ajustado', motivo: personalizada ? `Mensalidade personalizada: ${motivo.trim()}` : 'Valor padrão' }];
+        }
+      }
+      notify(d, aluno.id, 'Valor da mensalidade atualizado', personalizada ? `Sua mensalidade passa a ser ${brl(novo)} (${motivo.trim()}).` : `Sua mensalidade voltou ao valor padrão: ${brl(novo)}.`);
+    });
+    toast('Valor da mensalidade salvo.');
+  };
+
+  return (
+    <Card title="💲 Valor da mensalidade">
+      <div className="col">
+        <label className="check">
+          <input type="radio" name={`valor-${aluno.id}`} checked={modo === 'padrao'} onChange={() => setModo('padrao')} />
+          <div>Mensalidade padrão — <b>{brl(m.padrao)}</b>/mês<div className="xs muted">Calculada pelo plano e pelos valores da filial</div></div>
+        </label>
+        <label className="check">
+          <input type="radio" name={`valor-${aluno.id}`} checked={modo === 'personalizada'} onChange={() => setModo('personalizada')} />
+          <div>Mensalidade personalizada<div className="xs muted">Desconto ou benefício não previsto pelo sistema</div></div>
+        </label>
+        {modo === 'personalizada' && (
+          <div className="form-grid">
+            <Field label="Valor mensal (R$)" hint={valor !== '' && +valor < m.padrao ? `Desconto de ${brl(m.padrao - +valor)} (${Math.round((1 - +valor / m.padrao) * 100)}%)` : ''}>
+              <input type="number" min="0" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder={String(m.padrao)} />
+            </Field>
+            <Field label="Motivo"><input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: bolsa parcial, benefício social" /></Field>
+          </div>
+        )}
+        {aberta && (
+          <label className="check small">
+            <input type="checkbox" checked={aplicarAberta} onChange={(e) => setAplicarAberta(e.target.checked)} /> Aplicar também à mensalidade em aberto deste mês ({brl(aberta.valor)})
+          </label>
+        )}
+        {m.personalizada && <div className="xs muted">Atual: personalizada em {brl(m.valor)} por {m.por || '—'} · {m.motivo}</div>}
+        <div><button className="btn" onClick={salvar}>Salvar valor</button></div>
+      </div>
+    </Card>
+  );
 }

@@ -48,7 +48,7 @@ export function ExtratoPagamentos({ pagamentos, onPagar, titulo = '🧾 Minhas m
               <div className="xs muted">Vencimento {fmtDate(p.vencimento)}</div>
             </div>
             <b>{brl(p.valor)}</b>
-            <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />
+            <StatusBadge status={p.vencimento < hoje ? 'vencido' : 'pendente'} /> <SeloComprovante p={p} />{p.personalizada && <span className="badge gold" title={p.valorPadrao ? `Valor padrão: ${brl(p.valorPadrao)}` : ''}>🎁 Valor personalizado</span>}
             {onPagar && <button className="btn sm" onClick={() => onPagar(p)}>{p.analise === 'enviado' ? 'Ver / reenviar' : 'Pagar'}</button>}
           </div>
         )))}

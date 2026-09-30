@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useDB } from '../../lib/db';
+import { useDB, mensalidadeDoAluno } from '../../lib/db';
 import { brl } from '../../lib/utils';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 import { PageHead, Card, toast } from '../../components/ui';
-import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
+import { EscolhaPlano, salvarPlanoAluno, DiaVencimento } from '../../components/Planos';
 
 export default function MeuPlano({ user }) {
   const db = useDB();
@@ -11,6 +11,7 @@ export default function MeuPlano({ user }) {
   const filial = db.filiais.find((f) => f.id === eu.filialId);
   const [plano, setPlano] = useState(eu.plano || null);
   const [salvando, setSalvando] = useState(false);
+  const mensal = mensalidadeDoAluno(db, eu);
 
   if (!filial) return <div className="alert gold">Seu cadastro ainda não está vinculado a uma filial.</div>;
 
@@ -45,6 +46,12 @@ export default function MeuPlano({ user }) {
           Plano atual: <b>{resumoPlano(filial, eu.plano)}</b> · {brl(valorPlano(filial, eu.plano))}/mês
         </div>
       )}
+      {mensal.personalizada && (
+        <div className="alert ok mb">
+          🎁 Sua mensalidade é <b>{brl(mensal.valor)}</b> (valor padrão {brl(mensal.padrao)}) — {mensal.motivo || 'valor definido pelo professor'}.
+        </div>
+      )}
+      <div className="mb"><DiaVencimento aluno={eu} /></div>
       <Card>
         <EscolhaPlano filial={filial} value={plano} onChange={setPlano} />
         {temPlanos(filial) && (

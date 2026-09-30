@@ -511,6 +511,18 @@ export function professorVeAluno(db, user, a) {
   return am.some((m) => pm.includes(m));
 }
 
+/**
+ * Valor da mensalidade do aluno: o padrão (calculado pelo plano/filial) ou um valor personalizado
+ * definido pelo professor ou pela Central (desconto, benefício…).
+ */
+export function mensalidadeDoAluno(db, a) {
+  const f = db.filiais.find((x) => x.id === a?.filialId);
+  const padrao = valorPlano(f, a?.plano);
+  const p = a?.mensalidadePersonalizada;
+  if (p && p.valor != null && p.valor !== '' && +p.valor >= 0) return { valor: +p.valor, padrao, personalizada: true, motivo: p.motivo || '', por: p.por };
+  return { valor: padrao, padrao, personalizada: false };
+}
+
 /** Situação financeira do aluno: inadimplente se tiver mensalidade vencida além da tolerância */
 export function situacaoAluno(db, aluno) {
   if (!aluno) return { bloqueado: true, emAberto: [], vencidas: [] };
@@ -547,7 +559,9 @@ export function rotinaFinanceira() {
   const db0 = getDB();
   const comp = monthISO();
   const hoje = todayISO();
-  const dia = String(db0.config.diaVencimento || 10).padStart(2, '0');
+  const diaPadrao = db0.config.diaVencimento || 10;
+  // Dia escolhido pelo aluno (1 a 28) ou o padrão da Associação
+  const diaDe = (a) => String(a.diaVencimento >= 1 && a.diaVencimento <= 28 ? a.diaVencimento : diaPadrao).padStart(2, "0");
   let mudou = false;
   const draft = structuredClone(db0);
 
@@ -562,7 +576,7 @@ export function rotinaFinanceira() {
       const motivo = a.isentoPor ? a.isentoMotivo || 'Plano família' : 'Bolsista 100%';
       draft.pagamentos.push({
         id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,
-        descricao: `Mensalidade ${comp} — ${motivo}`, valor: 0, valorOriginal: valorPlano(fil, a.plano), vencimento: `${comp}-${dia}`,
+        descricao: `Mensalidade ${comp} — ${motivo}`, valor: 0, valorOriginal: valorPlano(fil, a.plano), vencimento: `${comp}-${diaDe(a)}`,
         status: 'pago', pagoEm: agora, metodo: 'isencao', isencao: a.isentoPor ? 'familia' : 'bolsa', confirmadoPor: 'Isenção automática',
         criadoEm: agora, lembretes: [], auditoria: [{ em: agora, por: 'Sistema', acao: 'isencao', motivo }],
       });
@@ -571,7 +585,7 @@ export function rotinaFinanceira() {
       const fil = draft.filiais.find((f) => f.id === a.filialId);
       draft.pagamentos.push({
         id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,
-        descricao: `Mensalidade ${comp}${temPlanos(fil) && a.plano ? ` — ${resumoPlano(fil, a.plano)}` : ""}`, valor: valorPlano(fil, a.plano), vencimento: `${comp}-${dia}`,
+        descricao: `Mensalidade ${comp}${temPlanos(fil) && a.plano ? ` — ${resumoPlano(fil, a.plano)}` : ""}`, valor: mensalidadeDoAluno(draft, a).valor, ...(mensalidadeDoAluno(draft, a).personalizada ? { valorPadrao: mensalidadeDoAluno(draft, a).padrao, personalizada: true } : {}), vencimento: `${comp}-${diaDe(a)}`,
         status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
       });
       mudou = true;

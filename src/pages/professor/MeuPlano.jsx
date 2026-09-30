@@ -6,7 +6,7 @@ import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/plan
 import { PageHead, Card, Modal, toast } from '../../components/ui';
 import { ExtratoPagamentos } from '../../components/Extrato';
 import { PixBox } from '../../components/shared';
-import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
+import { EscolhaPlano, salvarPlanoAluno, DiaVencimento } from '../../components/Planos';
 
 /**
  * O professor também é praticante: ganha uma matrícula de aluno (mesmo e-mail Google)
@@ -109,6 +109,7 @@ export default function ProfMeuPlano({ user }) {
         </Card>
       )}
 
+      {!pr.isento && <div className="mb"><DiaVencimento aluno={pr} /></div>}
       <ExtratoPagamentos pagamentos={db.pagamentos.filter((p) => p.pessoaId === pr.id)} onPagar={setPagar} />
 
       <Modal open={!!pagar} onClose={() => setPagar(null)} title={pagar?.descricao}>

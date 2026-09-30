@@ -3,7 +3,7 @@ import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, fili
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
-import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
+import { EscolhaPlano, salvarPlanoAluno, DiaVencimento, ValorMensalidade } from '../../components/Planos';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 
@@ -444,7 +444,7 @@ function AlunoModal({ id, user, onClose, ask }) {
         </div>
       )}
 
-      {tab === 'plano' && <PlanoDoAluno a={a} />}
+      {tab === 'plano' && <PlanoDoAluno a={a} user={user} />}
 
       {tab === 'financeiro' && (
         <div className="col">
@@ -541,7 +541,7 @@ function FichaA4({ a, fr }) {
 }
 
 /** Plano do aluno visto pelo professor/Central: modalidades, pacote ou família */
-function PlanoDoAluno({ a }) {
+function PlanoDoAluno({ a, user }) {
   const db = useDB();
   const filial = db.filiais.find((f) => f.id === a.filialId);
   const [plano, setPlano] = useState(a.plano || null);
@@ -574,6 +574,12 @@ function PlanoDoAluno({ a }) {
       )}
       <EscolhaPlano filial={filial} value={plano} onChange={setPlano} />
       {temPlanos(filial) && <div><button className="btn" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar plano'}</button></div>}
+      {!a.isento && (
+        <div className="grid g2">
+          <ValorMensalidade key={a.id + (a.mensalidadePersonalizada?.em || '')} aluno={a} user={user} />
+          <DiaVencimento aluno={a} />
+        </div>
+      )}
       {beneficiados.length > 0 && (
         <Card title="👨‍👩‍👧 Beneficiários isentos por este plano">
           {beneficiados.map((b) => <div key={b.id} className="list-item"><Avatar src={b.foto} name={b.nome} /><div className="grow">{b.nome}<div className="xs muted">{b.email}</div></div><span className="badge gold">Isento</span></div>)}
