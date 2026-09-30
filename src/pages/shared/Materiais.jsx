@@ -35,7 +35,6 @@ export default function Materiais({ user }) {
 
   const salvar = () => {
     if (!edit.titulo) return toast('Informe o título.');
-    if (!edit.url && !edit.arquivo) return toast('Informe um link ou envie um arquivo.');
     setDB((d) => {
       if (edit.id) Object.assign(d.materiais.find((m) => m.id === edit.id), edit);
       else {
@@ -116,9 +115,9 @@ export default function Materiais({ user }) {
                   <option value="professor">Somente professores</option>
                 </select>
               </Field>
-              <Field label="Link (YouTube, Drive, PDF…)" style={{ gridColumn: '1/-1' }}><Inp obj={edit} set={setEdit} k="url" type="url" placeholder="https://" /></Field>
+              <Field label="Link (YouTube, Drive, PDF…) — opcional" style={{ gridColumn: '1/-1' }}><Inp obj={edit} set={setEdit} k="url" type="url" placeholder="https://" /></Field>
             </div>
-            <Field label="Ou enviar arquivo" hint="Até 3 MB nesta versão (vídeos longos: use link do YouTube não listado ou Google Drive).">
+            <Field label="Ou enviar arquivo — opcional" hint="Pode salvar só com título e descrição e incluir o link/arquivo depois. Até 3 MB nesta versão (vídeos longos: use link do YouTube não listado ou Google Drive).">
               <div className="row">
                 <label className="btn ghost sm">
                   ⬆ {edit.arquivo ? 'Trocar arquivo' : 'Upload'}
