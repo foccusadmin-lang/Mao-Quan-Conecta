@@ -3,7 +3,9 @@ import { useDB, setDB, notify, professorEmDia } from '../../lib/db';
 import { uid, todayISO, readFileAsDataURL, youtubeEmbed } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Faixa, useConfirm, toast, Empty, FaixaOptions } from '../../components/ui';
 
-export const TIPOS_MAT = { taolu: ['🥋', 'Taolu'], base: ['🦵', 'Bases'], video: ['🎬', 'Vídeo'], teoria: ['📖', 'Teoria'], pdf: ['📄', 'Documento'], certificado: ['🏅', 'Certificado'] };
+export const TIPOS_MAT = { taolu: ['🥋', 'Taolu'], base: ['🦵', 'Bases'], video: ['🎬', 'Vídeo'], teoria: ['📖', 'Teoria'], texto: ['✍️', 'Texto / Apostila'], pdf: ['📄', 'Documento'], certificado: ['🏅', 'Certificado'] };
+/** Material só de texto (frases, trechos de apostila): não pede link nem arquivo */
+const soTexto = (tipo) => tipo === 'texto';
 const vazio = { titulo: '', tipo: 'video', faixaIdx: 0, url: '', arquivo: null, arquivoNome: '', descricao: '', publico: 'aluno', avancado: false };
 
 export function MaterialView({ m }) {
@@ -13,7 +15,7 @@ export function MaterialView({ m }) {
       {yt && <div className="video"><iframe src={yt} title={m.titulo} allowFullScreen allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" /></div>}
       {m.arquivo?.startsWith('data:video') && <div className="video"><video src={m.arquivo} controls controlsList="nodownload" /></div>}
       {m.arquivo?.startsWith('data:image') && <img src={m.arquivo} alt={m.titulo} style={{ borderRadius: 12 }} />}
-      {m.descricao && <p style={{ whiteSpace: 'pre-line', margin: 0 }}>{m.descricao}</p>}
+      {m.descricao && <p style={{ whiteSpace: 'pre-line', margin: 0, ...(soTexto(m.tipo) ? { fontSize: 16, lineHeight: 1.7 } : {}) }}>{m.descricao}</p>}
       <div className="row">
         {m.url && !yt && <a className="btn sm dark" href={m.url} target="_blank" rel="noreferrer">Abrir material ↗</a>}
         {m.arquivo && !m.arquivo.startsWith('data:video') && <a className="btn sm dark" href={m.arquivo} download={m.arquivoNome || m.titulo}>⬇ Baixar arquivo</a>}
@@ -35,6 +37,7 @@ export default function Materiais({ user }) {
 
   const salvar = () => {
     if (!edit.titulo) return toast('Informe o título.');
+    if (soTexto(edit.tipo) && !edit.descricao?.trim()) return toast('Escreva o texto do material.');
     setDB((d) => {
       if (edit.id) Object.assign(d.materiais.find((m) => m.id === edit.id), edit);
       else {
@@ -115,9 +118,14 @@ export default function Materiais({ user }) {
                   <option value="professor">Somente professores</option>
                 </select>
               </Field>
-              <Field label="Link (YouTube, Drive, PDF…) — opcional" style={{ gridColumn: '1/-1' }}><Inp obj={edit} set={setEdit} k="url" type="url" placeholder="https://" /></Field>
+              {!soTexto(edit.tipo) && <Field label="Link (YouTube, Drive, PDF…) — opcional" style={{ gridColumn: '1/-1' }}><Inp obj={edit} set={setEdit} k="url" type="url" placeholder="https://" /></Field>}
             </div>
-            <Field label="Ou enviar arquivo — opcional" hint="Pode salvar só com título e descrição e incluir o link/arquivo depois. Até 3 MB nesta versão (vídeos longos: use link do YouTube não listado ou Google Drive).">
+            {soTexto(edit.tipo) && (
+              <Field label="Texto do material" hint="Cole ou digite frases, trechos da apostila, fundamentos… Cada linha é mantida como você escrever.">
+                <Inp obj={edit} set={setEdit} k="descricao" type="textarea" rows={12} placeholder={'Ex.:\n“O Kung Fu começa e termina com respeito.”\n\nWu De — virtudes da ação: humildade, respeito, retidão, confiança e lealdade.'} style={{ minHeight: 260 }} />
+              </Field>
+            )}
+            {!soTexto(edit.tipo) && <Field label="Ou enviar arquivo — opcional" hint="Pode salvar só com título e descrição e incluir o link/arquivo depois. Até 3 MB nesta versão (vídeos longos: use link do YouTube não listado ou Google Drive).">
               <div className="row">
                 <label className="btn ghost sm">
                   ⬆ {edit.arquivo ? 'Trocar arquivo' : 'Upload'}
@@ -138,8 +146,8 @@ export default function Materiais({ user }) {
                 </label>
                 {edit.arquivo && <span className="small">{edit.arquivoNome} <button className="btn link sm" onClick={() => setEdit({ ...edit, arquivo: null, arquivoNome: '' })}>remover</button></span>}
               </div>
-            </Field>
-            <Field label="Descrição"><Inp obj={edit} set={setEdit} k="descricao" type="textarea" /></Field>
+            </Field>}
+            {!soTexto(edit.tipo) && <Field label="Descrição"><Inp obj={edit} set={setEdit} k="descricao" type="textarea" /></Field>}
             <label className="check"><Inp obj={edit} set={setEdit} k="avancado" type="checkbox" /> Treinamento avançado (exige tarifa de manutenção em dia)</label>
           </div>
         )}
