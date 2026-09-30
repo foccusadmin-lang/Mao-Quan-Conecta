@@ -203,7 +203,7 @@ export default function Financeiro({ user }) {
                         <button className={`btn sm ${p.analise === 'enviado' ? 'ok' : 'ghost'}`} title="Conferir comprovante e auditoria" onClick={() => setConferir(p.id)}>{p.comprovantes?.length ? '👁 Ver comprovante' : '🔎 Conferir'}</button>{' '}
                         <button className="btn sm ok" onClick={() => confirmar(p, 'pix')}>✔ Confirmar</button>{' '}
                         <button className="btn sm ghost" title="Recebido em mãos" onClick={() => confirmar(p, 'dinheiro')}>💵</button>{' '}
-                        <button className="btn sm ghost" title="Editar valor e vencimento desta mensalidade" onClick={() => setEditar(p.id)}>✏️ Editar valor</button>{' '}
+                        <button className="btn sm ghost" title="Editar valor e vencimento desta mensalidade" aria-label="Editar valor" onClick={() => setEditar(p.id)}>✏️</button>{' '}
                         {p.tipo === 'mensalidade' && db.alunos.some((a) => a.id === p.pessoaId && !a.isento) && (
                           <><button className="btn sm ghost" title="Tornar isento (bolsista 100%)" aria-label="Tornar isento" onClick={() => tornarIsento(p)}>🎓</button>{' '}</>
                         )}
