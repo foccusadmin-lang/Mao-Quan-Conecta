@@ -125,7 +125,14 @@ export default function Alunos({ user }) {
             onClick={() => {
               const alvo = db.alunos.find((x) => x.id === aprovar.id);
               setStatus(alvo, 'aprovado');
-              setDB((d) => corrigirGraduacao(d, aprovar.id, aprovar.faixaIdx, user));
+              setDB((d) => {
+                const x = d.alunos.find((y) => y.id === aprovar.id);
+                // Faixa declarada pelo aluno e mantida pelo professor: registra a conferência no histórico
+                if (x?.faixaInformada && x.faixaIdx === aprovar.faixaIdx)
+                  x.historicoGraduacao = [...(x.historicoGraduacao || []), { data: todayISO(), faixaIdx: x.faixaIdx, por: user.nome, manual: true, conferida: true }];
+                if (x) delete x.faixaInformada;
+                corrigirGraduacao(d, aprovar.id, aprovar.faixaIdx, user);
+              });
               setAprovar(null);
               toast('Cadastro aprovado.');
             }}
@@ -137,7 +144,11 @@ export default function Alunos({ user }) {
         {aprovar && (
           <div className="col">
             <div className="alert gold small">
-              <div>Todo cadastro novo começa na primeira faixa. Se o aluno <b>já é graduado</b>, selecione abaixo a faixa real dele antes de aprovar.</div>
+              {db.alunos.find((x) => x.id === aprovar.id)?.faixaInformada ? (
+                <div>O aluno informou no cadastro a faixa <b>{faixaNome(db, db.alunos.find((x) => x.id === aprovar.id).faixaIdx)}</b>. Confira e corrija abaixo se necessário antes de aprovar.</div>
+              ) : (
+                <div>O aluno se cadastrou como <b>Praticante</b> (sem faixa). Se ele <b>já é graduado</b>, selecione abaixo a faixa real dele antes de aprovar.</div>
+              )}
             </div>
             <Field label="Graduação do aluno">
               <select value={aprovar.faixaIdx} onChange={(e) => setAprovar({ ...aprovar, faixaIdx: +e.target.value })}><FaixaOptions /></select>
@@ -425,7 +436,7 @@ function AlunoModal({ id, user, onClose, ask }) {
           ))}
           {a.historicoGraduacao?.length > 0 && (
             <Card title="🎖️ Histórico de graduações">
-              {a.historicoGraduacao.map((h, i) => <div key={i} className="small">{fmtDate(h.data)} — {h.modalidade ? `${h.modalidade}: ${h.nomeNivel}` : faixaNome(db, h.faixaIdx)}{h.manual ? ` · alteração manual${h.por ? ` por ${h.por}` : ''}` : h.por ? ` · aprovada por ${h.por}` : ''}</div>)}
+              {a.historicoGraduacao.map((h, i) => <div key={i} className="small">{fmtDate(h.data)} — {h.modalidade ? `${h.modalidade}: ${h.nomeNivel}` : faixaNome(db, h.faixaIdx)}{h.conferida ? ` · informada pelo aluno, conferida por ${h.por}` : h.manual ? ` · alteração manual${h.por ? ` por ${h.por}` : ''}` : h.por ? ` · aprovada por ${h.por}` : ''}</div>)}
             </Card>
           )}
         </div>

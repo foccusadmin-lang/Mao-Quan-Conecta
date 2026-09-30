@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { useDB, useAuth, setDB, setSession, novoAluno, flush, recarregar } from '../lib/db';
-import { Field, toast, Avatar } from '../components/ui';
+import { Field, toast, Avatar, FaixaOptions } from '../components/ui';
 import { maskCPF, maskRG, maskTelefone } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { temPlanos, validarPlano } from '../lib/planos';
@@ -11,7 +11,7 @@ export default function PrimeiroAcesso() {
   const db = useDB();
   const auth = useAuth();
   const [enviando, setEnviando] = useState(false);
-  const [f, setF] = useState({ nome: auth.nome || '', telefone: '', nascimento: '', rg: '', cpf: '', filialId: '', responsavel: '' });
+  const [f, setF] = useState({ nome: auth.nome || '', telefone: '', nascimento: '', rg: '', cpf: '', filialId: '', responsavel: '', faixaIdx: 0 });
   const [plano, setPlano] = useState({ tipo: 'modalidades', modalidades: [] });
   const filialSel = db.filiais.find((x) => x.id === f.filialId);
 
@@ -24,6 +24,7 @@ export default function PrimeiroAcesso() {
     try {
       let id;
       const dados = { ...f, nome: f.nome.trim(), email: auth.email, foto: auth.foto || null };
+      if (f.faixaIdx > 0) dados.faixaInformada = true; // declarada pelo aluno — o professor confere na aprovação
       if (temPlanos(filial)) dados.plano = { ...plano, atualizadoEm: new Date().toISOString() };
       setDB((d) => void (id = novoAluno(d, dados).id));
       await flush();
@@ -62,7 +63,12 @@ export default function PrimeiroAcesso() {
               {db.filiais.filter((x) => x.ativa).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </select>
           </Field>
-          <Field label="Responsável (se menor de idade)" style={{ gridColumn: '1/-1' }}><input value={f.responsavel} onChange={(e) => setF({ ...f, responsavel: e.target.value })} /></Field>
+          <Field label="Graduação atual" hint="Se você ainda não tem faixa, deixe “Praticante”. O professor confere na aprovação.">
+            <select value={f.faixaIdx} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
+              <FaixaOptions />
+            </select>
+          </Field>
+          <Field label="Responsável (se menor de idade)"><input value={f.responsavel} onChange={(e) => setF({ ...f, responsavel: e.target.value })} /></Field>
         </div>
         {filialSel && temPlanos(filialSel) && (
           <div className="mt">
