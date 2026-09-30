@@ -48,6 +48,10 @@ export default function Financeiro({ user }) {
     return rec ? `${maskChavePix(rec.tipo, rec.chave)} (${rec.titular || rec.nome})` : db.config.pixChave;
   };
 
+  // Professor que também é praticante não edita nem isenta a própria mensalidade (fica com a Central ou outro professor)
+  const minhaFicha = !isAdmin ? db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase())?.id : null;
+  const ehMeu = (p) => !isAdmin && (p.pessoaId === user.id || (minhaFicha && p.pessoaId === minhaFicha));
+
   /** Torna o aluno isento (bolsista 100%): esta mensalidade é quitada como isenção e as próximas saem como bolsa */
   const tornarIsento = (p) => {
     const a = db.alunos.find((x) => x.id === p.pessoaId);
@@ -203,8 +207,8 @@ export default function Financeiro({ user }) {
                         <button className={`btn sm ${p.analise === 'enviado' ? 'ok' : 'ghost'}`} title="Conferir comprovante e auditoria" onClick={() => setConferir(p.id)}>{p.comprovantes?.length ? '👁 Ver comprovante' : '🔎 Conferir'}</button>{' '}
                         <button className="btn sm ok" onClick={() => confirmar(p, 'pix')}>✔ Confirmar</button>{' '}
                         <button className="btn sm ghost" title="Recebido em mãos" onClick={() => confirmar(p, 'dinheiro')}>💵</button>{' '}
-                        <button className="btn sm ghost" title="Editar valor e vencimento desta mensalidade" aria-label="Editar valor" onClick={() => setEditar(p.id)}>✏️</button>{' '}
-                        {p.tipo === 'mensalidade' && db.alunos.some((a) => a.id === p.pessoaId && !a.isento) && (
+                        {!ehMeu(p) && <><button className="btn sm ghost" title="Editar valor e vencimento desta mensalidade" aria-label="Editar valor" onClick={() => setEditar(p.id)}>✏️</button>{' '}</>}
+                        {!ehMeu(p) && p.tipo === 'mensalidade' && db.alunos.some((a) => a.id === p.pessoaId && !a.isento) && (
                           <><button className="btn sm ghost" title="Tornar isento (bolsista 100%)" aria-label="Tornar isento" onClick={() => tornarIsento(p)}>🎓</button>{' '}</>
                         )}
                         <button className="btn sm ghost" title="Lembrete WhatsApp" onClick={() => lembrete(p)}>📲</button>{' '}
