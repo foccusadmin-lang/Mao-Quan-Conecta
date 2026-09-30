@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { useDB, useSession, useAuth, setSession, temRecurso, recarregar } from './lib/db';
+import { useDB, useSession, useAuth, setSession, temRecurso, recarregar, useFilialAtiva, filiaisDoProfessor } from './lib/db';
 import { supabase } from './lib/supabase';
 import PrimeiroAcesso from './pages/PrimeiroAcesso';
 import Layout from './components/Layout';
@@ -51,18 +51,24 @@ import { PageHead } from './components/ui';
 function useCurrentUser() {
   const db = useDB();
   const s = useSession();
+  const ativa = useFilialAtiva();
+  // Professor com mais de uma filial: o painel trabalha na filial escolhida no topo (as demais continuam acessíveis)
+  const comoProfessor = (p) => {
+    const filiais = filiaisDoProfessor(p);
+    return { ...p, role: 'professor', filiais, filialPrincipal: p.filialId, filialId: filiais.includes(ativa) ? ativa : p.filialId };
+  };
   if (!s) return null;
   if (s.role === 'admin') return { id: 'admin', role: 'admin', nome: 'Central Mao', foto: null };
   if (s.role === 'professor') {
     const p = db.professores.find((x) => x.id === s.id && x.ativo);
-    return p ? { ...p, role: 'professor' } : null;
+    return p ? comoProfessor(p) : null;
   }
   if (s.role === 'aluno') {
     const a = db.alunos.find((x) => x.id === s.id);
     if (!a) return null;
     // Aluno promovido a Professor: a mesma conta Google passa a abrir o Painel do Laoshi
     const p = db.professores.find((x) => x.ativo && x.email.toLowerCase() === a.email.toLowerCase());
-    return p ? { ...p, role: 'professor' } : { ...a, role: 'aluno' };
+    return p ? comoProfessor(p) : { ...a, role: 'aluno' };
   }
   return null;
 }

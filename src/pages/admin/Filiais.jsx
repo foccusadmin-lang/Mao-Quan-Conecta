@@ -19,25 +19,28 @@ export default function Filiais() {
     const equipe = edit.equipe.filter((r) => r.professorId);
     if (new Set(equipe.map((r) => r.professorId)).size !== equipe.length) return toast('O mesmo professor aparece duas vezes na equipe.');
     const principal = equipe.some((r) => r.professorId === edit.professorId) ? edit.professorId : equipe[0]?.professorId || null;
+    const antesEquipe = edit.id ? responsaveisFilial(db.filiais.find((f) => f.id === edit.id)) : [];
     setDB((d) => {
       const data = { ...edit, equipe, professorId: principal };
       delete data._fotoProf;
       if (edit.id) Object.assign(d.filiais.find((f) => f.id === edit.id), data);
       else d.filiais.push({ ...data, id: uid('fil') });
       const fid = edit.id || d.filiais.at(-1).id;
-      // Cada professor responde por uma filial: sai da equipe das outras e passa a ser vinculado a esta
-      equipe.forEach(({ professorId }) => {
-        d.filiais.forEach((f) => {
-          if (f.id === fid || !responsaveisFilial(f).some((r) => r.professorId === professorId)) return;
-          f.equipe = responsaveisFilial(f).filter((r) => r.professorId !== professorId);
-          if (f.professorId === professorId) f.professorId = f.equipe[0]?.professorId || null;
-        });
+      // O professor pode responder por mais de uma filial: esta é ACRESCENTADA às dele (não sai das outras)
+      equipe.forEach(({ professorId, departamentos: deps }) => {
         const p = d.professores.find((x) => x.id === professorId);
-        if (p) {
-          p.filialId = fid;
-          p.modalidades = [...(equipe.find((r) => r.professorId === professorId)?.departamentos || [])]; // mesma informação no cadastro do professor
-        }
+        if (!p) return;
+        if (!p.filialId) p.filialId = fid;
+        else if (p.filialId !== fid && !(p.filiaisExtras || []).includes(fid)) p.filiaisExtras = [...(p.filiaisExtras || []), fid];
+        // Modalidades: no cadastro do professor só quando ele tem uma filial (com várias, valem as de cada equipe)
+        if (!(p.filiaisExtras || []).length) p.modalidades = [...(deps || [])];
       });
+      // Quem saiu da equipe desta filial deixa de tê-la como filial adicional
+      for (const r of antesEquipe) {
+        if (equipe.some((x) => x.professorId === r.professorId)) continue;
+        const p = d.professores.find((x) => x.id === r.professorId);
+        if (p?.filiaisExtras?.includes(fid)) p.filiaisExtras = p.filiaisExtras.filter((x) => x !== fid);
+      }
       if (principal && edit._fotoProf !== undefined) {
         const p = d.professores.find((x) => x.id === principal);
         p.foto = edit._fotoProf;
@@ -168,7 +171,7 @@ export default function Filiais() {
                         );
                       })}
                     </div>
-                    {outraFilial && <div className="xs" style={{ color: 'var(--red)', marginTop: 6 }}>Hoje vinculado a {filialNome(db, outraFilial)} — ao salvar, passa para esta filial.</div>}
+                    {outraFilial && <div className="xs" style={{ color: 'var(--ok)', marginTop: 6 }}>Também responde por {filialNome(db, outraFilial)} — esta filial será acrescentada às dele.</div>}
                   </div>
                 );
               })}

@@ -24,6 +24,7 @@ export default function Professores() {
     } catch (e) {
       return toast('Chave PIX: ' + e.message);
     }
+    const antesExtras = (edit.id && db.professores.find((p) => p.id === edit.id)?.filiaisExtras) || [];
     setDB((d) => {
       const data = { ...edit, email, filialId: edit.filialId || null, pix };
       if (!pix) delete data.pix;
@@ -50,6 +51,16 @@ export default function Professores() {
         if (f && !f.professorId) adicionarResponsavel(f, id);
         // Mantém as modalidades iguais na equipe de responsáveis da filial
         if (f && ehResponsavel(f, id)) f.equipe = responsaveisFilial(f).map((r) => (r.professorId === id ? { ...r, departamentos: [...(data.modalidades || [])] } : r));
+      }
+      // Filiais adicionais: entra na equipe de responsáveis de cada uma; sai das que foram desmarcadas
+      const extras = (data.filiaisExtras || []).filter((x) => x && x !== data.filialId);
+      const alvo = d.professores.find((p) => p.id === id);
+      alvo.filiaisExtras = extras;
+      if (!extras.length) delete alvo.filiaisExtras;
+      for (const f of d.filiais) {
+        if (f.id === data.filialId) continue;
+        if (extras.includes(f.id)) adicionarResponsavel(f, id);
+        else if (antesExtras.includes(f.id)) removerResponsavel(f, id);
       }
     });
     setEdit(null);
@@ -97,7 +108,7 @@ export default function Professores() {
                       </div>
                     </td>
                     <td>
-                      {filialNome(db, p.filialId)}
+                      {filialNome(db, p.filialId)}{p.filiaisExtras?.length ? <span className="xs muted"> + {p.filiaisExtras.map((x) => filialNome(db, x)).join(", ")}</span> : null}
                       <div className="xs">
                         {db.filiais.some((f) => ehResponsavel(f, p.id)) && <span className="badge gold" style={{ marginRight: 4 }}>{db.filiais.some((f) => f.professorId === p.id) ? 'Responsável principal' : 'Responsável'}</span>}
                         {p.pix?.chave ? <span className="badge ok">PIX ✓</span> : <span className="badge">Sem PIX</span>}
@@ -145,6 +156,18 @@ export default function Professores() {
                   <option value="">— Nenhuma —</option>
                   {db.filiais.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
+              </Field>
+              <Field label="Filiais adicionais" style={{ gridColumn: '1/-1' }} hint="Para quem responde por mais de uma filial (ex.: Sede e Engenho Novo). No painel ele escolhe no topo em qual filial está trabalhando.">
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  {db.filiais.filter((f) => f.id !== edit.filialId).map((f) => {
+                    const on = (edit.filiaisExtras || []).includes(f.id);
+                    return (
+                      <button key={f.id} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => setEdit({ ...edit, filiaisExtras: on ? edit.filiaisExtras.filter((x) => x !== f.id) : [...(edit.filiaisExtras || []), f.id] })}>
+                        {on ? '✓ ' : ''}{f.nome}
+                      </button>
+                    );
+                  })}
+                </div>
               </Field>
               <Field label="Modalidades sob responsabilidade" style={{ gridColumn: '1/-1' }} hint="O professor vê só os alunos dessas modalidades na filial. Sem nenhuma marcada, vê todos os alunos da filial.">
                 <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

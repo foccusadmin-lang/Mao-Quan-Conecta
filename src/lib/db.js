@@ -101,6 +101,24 @@ export const useDB = () => useSyncExternalStore(subscribe, () => state);
 export const useSession = () => useSyncExternalStore(subscribe, () => session);
 export const useAuth = () => useSyncExternalStore(subscribe, () => auth);
 
+// ---------- Filial ativa do professor (quem responde por mais de uma filial) ----------
+const CHAVE_FILIAL = 'mq-filial-ativa';
+let filialAtiva = null;
+try {
+  filialAtiva = localStorage.getItem(CHAVE_FILIAL);
+} catch {}
+const ouvintesFilial = new Set();
+export function setFilialAtiva(id) {
+  filialAtiva = id;
+  try {
+    localStorage.setItem(CHAVE_FILIAL, id);
+  } catch {}
+  ouvintesFilial.forEach((l) => l());
+}
+export const useFilialAtiva = () => useSyncExternalStore((l) => (ouvintesFilial.add(l), () => ouvintesFilial.delete(l)), () => filialAtiva);
+/** Filial principal + adicionais do professor */
+export const filiaisDoProfessor = (p) => [...new Set([p?.filialId, ...(p?.filiaisExtras || [])].filter(Boolean))];
+
 // ---------- Sincronização com o Supabase ----------
 let timer = null;
 let fila = Promise.resolve();
@@ -389,7 +407,7 @@ export function notificacoesDe(db, user) {
   if (!user) return [];
   const alvos = new Set(['todos', user.id]);
   if (user.role === 'admin') alvos.add('admin');
-  if (user.filialId) alvos.add('filial:' + user.filialId);
+  for (const fid of user.filiais?.length ? user.filiais : [user.filialId]) if (fid) alvos.add('filial:' + fid);
   if (user.role === 'professor') alvos.add('professores');
   return db.notificacoes.filter((n) => alvos.has(n.para));
 }
@@ -485,9 +503,10 @@ export const ehResponsavel = (f, professorId) => responsaveisFilial(f).some((r) 
 // ---------- Modalidades: o que cada professor enxerga ----------
 /** Modalidades sob responsabilidade do professor (cadastro dele; senão, as marcadas na equipe da filial) */
 export function modalidadesProfessor(db, prof) {
-  if (prof?.modalidades?.length) return prof.modalidades;
+  // Na filial em que está trabalhando valem as modalidades marcadas na equipe dela; senão, as do cadastro
   const f = db.filiais.find((x) => x.id === prof?.filialId);
-  return responsaveisFilial(f).find((r) => r.professorId === prof?.id)?.departamentos || [];
+  const daEquipe = responsaveisFilial(f).find((r) => r.professorId === prof?.id)?.departamentos || [];
+  return daEquipe.length ? daEquipe : prof?.modalidades || [];
 }
 
 /** Modalidades que o aluno pratica: as do plano escolhido + as que têm graduação (TCQ, Sanda…) */

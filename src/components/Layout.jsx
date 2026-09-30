@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useDB, setDB, setSession, notificacoesDe, temRecurso } from '../lib/db';
+import { useDB, setDB, setSession, notificacoesDe, temRecurso, setFilialAtiva } from '../lib/db';
 import { fmtDateTime } from '../lib/utils';
 import { Avatar, Modal, Empty } from './ui';
 import { WhatsFab } from './shared';
@@ -115,6 +115,14 @@ export default function Layout({ user }) {
         <header className="topbar">
           <button className="btn icon ghost burger" onClick={() => setOpen(true)} aria-label="Menu">☰</button>
           <h1>{current[2]}</h1>
+          {user.role === 'professor' && user.filiais?.length > 1 && (
+            <label className="row" style={{ gap: 6, marginLeft: 'auto', flexWrap: 'nowrap' }} title="Você responde por mais de uma filial: escolha em qual está trabalhando">
+              <span className="xs muted hide-sm">Filial:</span>
+              <select value={user.filialId} onChange={(e) => setFilialAtiva(e.target.value)} style={{ maxWidth: 220, padding: '6px 10px', fontWeight: 600 }}>
+                {user.filiais.map((fid) => <option key={fid} value={fid}>{db.filiais.find((f) => f.id === fid)?.nome || fid}</option>)}
+              </select>
+            </label>
+          )}
           <button className="btn icon ghost bell" onClick={openBell} aria-label="Notificações">
             🔔{unread > 0 && <span className="dot">{unread}</span>}
           </button>
