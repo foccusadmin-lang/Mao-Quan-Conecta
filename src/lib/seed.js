@@ -8,6 +8,7 @@ const COR = { branca: '#f5f5f5', vermelha: '#d0121b', cinza: '#9a9a9a', amarela:
 const fx = (nivel, nome, cor, extra = {}) => ({ nivel, nome, cor, ponta: null, hanzi: null, ...extra });
 export const NIVEIS = ['Iniciante', 'Intermediária', 'Avançado', 'Professor'];
 export const FAIXAS_PADRAO = [
+  fx('Iniciante', 'Praticante', '#e7e2dc', { semFaixa: true }), // quem ainda não tem faixa
   fx('Iniciante', 'Branca Ponta Vermelha', COR.branca, { ponta: COR.vermelha }),
   fx('Iniciante', 'Branca', COR.branca),
   fx('Iniciante', 'Branca Ponta Cinza', COR.branca, { ponta: COR.cinza }),
@@ -47,7 +48,7 @@ export const TAXAS_EXAME_2026 = {
   'Vermelha Ponta Preta': 250,
 };
 // Conversão do sistema antigo (9 faixas) para o oficial
-export const MAPA_FAIXAS_ANTIGAS = [1, 5, 5, 7, 9, 9, 11, 11, 13];
+export const MAPA_FAIXAS_ANTIGAS = [2, 6, 6, 8, 10, 10, 12, 12, 14];
 
 const DIRETORIA_2025 = [
   ['Presidente', ['Mestre FRANCISCO CRIZANTE OLIVEIRA SILVA (Shifu)']],
@@ -119,7 +120,7 @@ export function seed() {
     presencas: [],
     materiais: [
       { id: uid('m'), titulo: 'Bases fundamentais (Ma Bu, Gong Bu, Pu Bu)', tipo: 'base', faixaIdx: 0, url: '', arquivo: null, descricao: 'Posturas básicas do estilo. Substitua pelo link do vídeo oficial.', publico: 'aluno', criadoEm: hoje },
-      { id: uid('m'), titulo: 'Taolu da Faixa Amarela', tipo: 'taolu', faixaIdx: 5, url: '', arquivo: null, descricao: 'Sequência oficial da faixa amarela.', publico: 'aluno', criadoEm: hoje },
+      { id: uid('m'), titulo: 'Taolu da Faixa Amarela', tipo: 'taolu', faixaIdx: 6, url: '', arquivo: null, descricao: 'Sequência oficial da faixa amarela.', publico: 'aluno', criadoEm: hoje },
       { id: uid('m'), titulo: 'Didática para Laoshi — Módulo 1', tipo: 'teoria', faixaIdx: 0, url: '', arquivo: null, descricao: 'Capacitação técnica para professores.', publico: 'professor', criadoEm: hoje },
     ],
     eventos: [

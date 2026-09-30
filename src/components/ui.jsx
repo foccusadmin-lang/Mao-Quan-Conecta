@@ -314,7 +314,7 @@ export function Faixa({ idx, nivel }) {
   if (!f) return <span className="muted">—</span>;
   return (
     <span className="faixa" title={`${f.nivel ? f.nivel + ' · ' : ''}${f.nome}`}>
-      <i style={{ background: faixaFundo(f) }} />
+      <i style={f.semFaixa ? { background: 'transparent', border: '1.5px dashed #b9b2aa' } : { background: faixaFundo(f) }} />
       {f.nome}
       {nivel && f.nivel && <em className="xs muted" style={{ fontStyle: 'normal', fontWeight: 500 }}>· {f.nivel}</em>}
     </span>

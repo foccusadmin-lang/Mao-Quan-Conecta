@@ -37,7 +37,7 @@ export default function Carteirinhas() {
 
   const pessoas = tipo === 'professor' ? db.professores : db.alunos.filter((a) => a.status === 'aprovado' && (tipo === 'aluno' || a.atleta?.ativo));
   const pessoa = pessoas.find((p) => p.id === pessoaId) || pessoas[0];
-  const exemplo = { id: 'exemplo', nome: 'Nome do Praticante', rg: '12.345.678-9', cpf: '123.456.789-00', nascimento: '2000-01-01', faixaIdx: 1, filialId: 'fil1', matricula: 'MQ0000', foto: null, qrToken: 'x', filiacaoValidaAte: `${new Date().getFullYear()}-12-31` };
+  const exemplo = { id: 'exemplo', nome: 'Nome do Praticante', rg: '12.345.678-9', cpf: '123.456.789-00', nascimento: '2000-01-01', faixaIdx: 2, filialId: 'fil1', matricula: 'MQ0000', foto: null, qrToken: 'x', filiacaoValidaAte: `${new Date().getFullYear()}-12-31` };
   const dados = dadosCarteirinha(db, pessoa || exemplo, tipo);
 
   const upd = (fn) => setDB((d) => void fn(d.modelos[tipo]));
