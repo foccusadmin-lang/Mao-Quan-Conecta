@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useDB, situacaoAluno } from '../../lib/db';
-import { PageHead, Card, Faixa } from '../../components/ui';
+import { PageHead, Card, Faixa, NiveisModalidade } from '../../components/ui';
 import { useQR } from '../../components/shared';
 import { Carteirinha, ExportButtons, dadosCarteirinha } from '../../components/Carteirinha';
 
@@ -37,7 +37,7 @@ export default function AlunoCarteira({ user }) {
           <div className="qrbox">{qr && <img src={qr} alt="QR Code de identificação" />}</div>
           <div style={{ fontWeight: 800, fontSize: 18 }}>{user.nome}</div>
           <div className="row" style={{ justifyContent: 'center', marginTop: 6 }}>
-            <span className="badge" style={{ background: '#fff' }}><Faixa idx={user.faixaIdx} /></span>
+            <span className="badge" style={{ background: '#fff' }}><Faixa idx={user.faixaIdx} /></span>{" "}<NiveisModalidade aluno={user} escuro />
             <span className="badge ink">{user.matricula}</span>
           </div>
           <div className="mt">{fin.bloqueado ? <span className="badge red">Situação irregular</span> : <span className="badge ok">Filiado regular</span>}</div>

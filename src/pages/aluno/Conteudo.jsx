@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDB, situacaoAluno } from '../../lib/db';
-import { PageHead, Card, Modal, Faixa, Empty } from '../../components/ui';
+import { PageHead, Card, Modal, Faixa, Empty, NiveisModalidade } from '../../components/ui';
 import { MaterialView, TIPOS_MAT } from '../shared/Materiais';
 
 export default function Conteudo({ user }) {
@@ -16,7 +16,7 @@ export default function Conteudo({ user }) {
   return (
     <>
       <PageHead title="Meu Conteúdo" sub="Taolu, bases e teoria do seu nível atual">
-        <span className="badge" style={{ padding: '6px 12px' }}><Faixa idx={user.faixaIdx} /></span>
+        <span className="badge" style={{ padding: '6px 12px' }}><Faixa idx={user.faixaIdx} /></span>{" "}<NiveisModalidade aluno={user} />
       </PageHead>
 
       {fin.bloqueado && (

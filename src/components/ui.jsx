@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, useSyncExternalStore } from 'react';
 import { initials, readImage } from '../lib/utils';
-import { useDB } from '../lib/db';
+import { useDB, nivelsModalidade } from '../lib/db';
 
 export function PageHead({ title, sub, children }) {
   return (
@@ -317,6 +317,22 @@ export function Faixa({ idx, nivel }) {
       <i style={{ background: faixaFundo(f) }} />
       {f.nome}
       {nivel && f.nivel && <em className="xs muted" style={{ fontStyle: 'normal', fontWeight: 500 }}>· {f.nivel}</em>}
+    </span>
+  );
+}
+
+/** Níveis nas modalidades (ex.: ☯️ TCQ Intermediário · 🥊 Sanda Iniciante) */
+export function NiveisModalidade({ aluno, escuro }) {
+  const db = useDB();
+  const lista = nivelsModalidade(db, aluno);
+  if (!lista.length) return null;
+  return (
+    <span className="row" style={{ gap: 4, display: 'inline-flex', flexWrap: 'wrap' }}>
+      {lista.map((n) => (
+        <span key={n.modalidade} className="badge" style={escuro ? { background: '#fff' } : { background: 'var(--gold-soft, #fbf3dc)' }} title={n.modalidade}>
+          {n.icone} {n.nome}
+        </span>
+      ))}
     </span>
   );
 }

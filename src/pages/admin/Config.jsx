@@ -2,7 +2,7 @@
 import { useDB, setDB, replaceDB, DEPARTAMENTOS_PADRAO } from '../../lib/db';
 import { uid, brl } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo } from '../../components/ui';
-import { FAIXAS_PADRAO, NIVEIS, TAXAS_EXAME_2026 } from '../../lib/seed';
+import { FAIXAS_PADRAO, NIVEIS, TAXAS_EXAME_2026, GRAD_MODALIDADES_PADRAO } from '../../lib/seed';
 import { PixBox } from '../../components/shared';
 
 export default function Config() {
@@ -10,7 +10,9 @@ export default function Config() {
   const [c, setC] = useState(db.config);
   const [ask, confirmEl] = useConfirm();
   const salvar = () => {
-    setDB((d) => (d.config = { ...d.config, ...c }));
+    const limpo = { ...c };
+    if (c.gradModalidades) limpo.gradModalidades = c.gradModalidades.filter((t) => t.modalidade?.trim()).map((t) => ({ ...t, modalidade: t.modalidade.trim(), niveis: t.niveis.map((n) => n.trim()).filter(Boolean) }));
+    setDB((d) => (d.config = { ...d.config, ...limpo }));
     toast('Configurações salvas.');
   };
 
@@ -137,6 +139,29 @@ export default function Config() {
           <Field label="Modalidades das filiais (uma por linha)" hint="Usadas para definir a área de cada professor responsável em Filiais">
             <textarea rows={4} value={(c.departamentos || DEPARTAMENTOS_PADRAO).join('\n')} onChange={(e) => setC({ ...c, departamentos: e.target.value.split('\n') })} />
           </Field>
+        </Card>
+
+        <Card title="☯️ Graduações por modalidade">
+          <p className="xs muted" style={{ marginTop: 0 }}>Níveis próprios de cada modalidade, além da faixa (ex.: TCQ Iniciante → TCQ Avançado). O professor da filial ou a Central define na ficha do aluno.</p>
+          {(c.gradModalidades?.length ? c.gradModalidades : GRAD_MODALIDADES_PADRAO).map((t, i, lista) => {
+            const set = (patch) => setC({ ...c, gradModalidades: lista.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+            return (
+              <div key={i} className="card mb" style={{ padding: 12 }}>
+                <div className="row" style={{ gap: 6 }}>
+                  <input value={t.icone || ''} onChange={(e) => set({ icone: e.target.value })} style={{ width: 56, textAlign: 'center' }} aria-label="Ícone" />
+                  <input value={t.modalidade} onChange={(e) => set({ modalidade: e.target.value })} style={{ flex: '1 1 160px' }} aria-label="Modalidade" />
+                  <button className="btn sm ghost icon" aria-label="Remover modalidade" onClick={() => setC({ ...c, gradModalidades: lista.filter((_, j) => j !== i) })}>✕</button>
+                </div>
+                <Field label="Níveis (um por linha, do primeiro ao último)" style={{ marginTop: 8 }}>
+                  <textarea rows={3} value={t.niveis.join('\n')} onChange={(e) => set({ niveis: e.target.value.split('\n') })} />
+                </Field>
+              </div>
+            );
+          })}
+          <div className="row">
+            <button className="btn sm ghost" onClick={() => setC({ ...c, gradModalidades: [...(c.gradModalidades?.length ? c.gradModalidades : GRAD_MODALIDADES_PADRAO), { modalidade: 'Nova modalidade', icone: '🎖️', niveis: ['Iniciante', 'Intermediário', 'Avançado'] }] })}>+ Modalidade</button>
+            <button className="btn sm ghost" onClick={() => ask('Restaurar as graduações padrão (TCQ e Sanda)?', () => setC({ ...c, gradModalidades: GRAD_MODALIDADES_PADRAO }), 'Restaurar')}>↺ Padrão</button>
+          </div>
         </Card>
 
         <Card title="🎖️ Taxa de exame de faixa">

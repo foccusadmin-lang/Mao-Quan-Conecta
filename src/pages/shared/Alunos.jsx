@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
-import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, faixaNome, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
+import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
-import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
+import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
 import { EscolhaPlano, salvarPlanoAluno } from '../../components/Planos';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
@@ -92,7 +92,7 @@ export default function Alunos({ user }) {
                         </div>
                       </td>
                       {isAdmin && <td className="hide-sm">{filialNome(db, a.filialId)}</td>}
-                      <td><Faixa idx={a.faixaIdx} /></td>
+                      <td><Faixa idx={a.faixaIdx} /><div><NiveisModalidade aluno={a} /></div></td>
                       <td className="hide-sm">{fr ? <span className={`badge ${fr.ok ? 'ok' : 'red'}`}>{fr.pct}%</span> : '—'}</td>
                       <td>
                         {a.status === 'aprovado' && !a.ultimoAcesso && !a.termos ? <span className="badge" title="Acesso liberado — ainda não entrou no app">⏳ Aguardando 1º acesso</span> : a.status !== 'aprovado' ? <StatusBadge status={a.status} /> : a.isento ? <span className="badge gold" title={a.isentoMotivo || ""}>{a.isentoPor ? "👨‍👩‍👧 Família" : "Isento"}</span> : fin.bloqueado ? <span className="badge red">Bloqueado</span> : <span className="badge ok">Em dia</span>}
@@ -213,10 +213,22 @@ function AlunoModal({ id, user, onClose, ask }) {
       const x = d.alunos.find((y) => y.id === id);
       const antes = x.atleta?.ativo;
       if ((f.foto || null) !== (x.foto || null)) x.fotoDefinida = true; // não volta a ser a foto do Google
-      Object.assign(x, { ...f, fotoDefinida: x.fotoDefinida, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
+      const gradAntes = { ...(x.gradModalidades || {}) };
+      Object.assign(x, { ...f, gradModalidades: x.gradModalidades, fotoDefinida: x.fotoDefinida, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
       if (!x.plano) delete x.plano;
       if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
       if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
+      // Graduações por modalidade (TCQ, Sanda…): registra no histórico e avisa o aluno
+      if (podeGraduar) {
+        for (const t of gradModalidades(d)) {
+          const novo = f.gradModalidades?.[t.modalidade] ?? null;
+          const velho = gradAntes[t.modalidade] ?? null;
+          if (novo === velho) continue;
+          x.gradModalidades = { ...(x.gradModalidades || {}), [t.modalidade]: novo };
+          x.historicoGraduacao = [...(x.historicoGraduacao || []), { data: todayISO(), modalidade: t.modalidade, nivel: novo, nomeNivel: novo == null ? 'sem graduação' : t.niveis[novo], por: user.nome, manual: true }];
+          if (novo != null) notify(d, id, `Graduação ${t.modalidade} 🎖️`, `Seu nível em ${t.modalidade} agora é ${t.niveis[novo]}.`);
+        }
+      }
       if (!antes && f.atleta?.ativo) notify(d, id, 'Você foi convocado(a) como Atleta 🏆', `Polo: ${f.atleta.polo || '—'}. Acesse a aba Atleta e assine o termo.`);
     });
     toast('Aluno salvo.');
@@ -273,6 +285,18 @@ function AlunoModal({ id, user, onClose, ask }) {
                 <FaixaOptions />
               </select>
             </Field>
+            {gradModalidades(db).map((t) => (
+              <Field key={t.modalidade} label={`${t.icone || '🎖️'} Graduação ${t.modalidade}`}>
+                <select
+                  value={f.gradModalidades?.[t.modalidade] ?? ''}
+                  disabled={!podeGraduar}
+                  onChange={(e) => setF({ ...f, gradModalidades: { ...(f.gradModalidades || {}), [t.modalidade]: e.target.value === '' ? null : +e.target.value } })}
+                >
+                  <option value="">Não pratica / sem graduação</option>
+                  {t.niveis.map((n, i) => <option key={n} value={i}>{n}</option>)}
+                </select>
+              </Field>
+            ))}
             <Field label="Situação do cadastro">
               <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value, aprovadoEm: f.aprovadoEm || (e.target.value === 'aprovado' ? todayISO() : undefined) })}>
                 <option value="pendente">Pendente</option>
@@ -401,7 +425,7 @@ function AlunoModal({ id, user, onClose, ask }) {
           ))}
           {a.historicoGraduacao?.length > 0 && (
             <Card title="🎖️ Histórico de graduações">
-              {a.historicoGraduacao.map((h, i) => <div key={i} className="small">{fmtDate(h.data)} — {faixaNome(db, h.faixaIdx)}{h.manual ? ` · alteração manual${h.por ? ` por ${h.por}` : ''}` : h.por ? ` · aprovada por ${h.por}` : ''}</div>)}
+              {a.historicoGraduacao.map((h, i) => <div key={i} className="small">{fmtDate(h.data)} — {h.modalidade ? `${h.modalidade}: ${h.nomeNivel}` : faixaNome(db, h.faixaIdx)}{h.manual ? ` · alteração manual${h.por ? ` por ${h.por}` : ''}` : h.por ? ` · aprovada por ${h.por}` : ''}</div>)}
             </Card>
           )}
         </div>

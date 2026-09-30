@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useDB, situacaoAluno, frequencia, filialNome } from '../../lib/db';
 import { brl, fmtDate, todayISO } from '../../lib/utils';
-import { Card, Faixa, Avatar, Empty } from '../../components/ui';
+import { Card, Faixa, Avatar, Empty, NiveisModalidade } from '../../components/ui';
 import { InvestButton, SponsorShare } from '../../components/shared';
 import { MarcarPresenca } from './Presenca';
 
@@ -22,7 +22,7 @@ export default function AlunoHome({ user }) {
           <div className="grow">
             <h2 style={{ margin: 0 }}>Olá, {user.nome.split(' ')[0]}!</h2>
             <div className="row small" style={{ opacity: 0.9, marginTop: 4 }}>
-              <span className="badge" style={{ background: '#fff' }}><Faixa idx={user.faixaIdx} /></span>
+              <span className="badge" style={{ background: '#fff' }}><Faixa idx={user.faixaIdx} /></span>{" "}<NiveisModalidade aluno={user} escuro />
               <span>{filialNome(db, user.filialId)}</span>
               {prof && <span>· {prof.titulo} {prof.nome}</span>}
             </div>

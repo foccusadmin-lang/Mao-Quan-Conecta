@@ -26,6 +26,11 @@ export const FAIXAS_PADRAO = [
   fx('Professor', 'Preta (Hanzi Branco)', COR.preta, { hanzi: '#ffffff' }),
 ];
 export const IDX_PRIMEIRA_PRETA = FAIXAS_PADRAO.findIndex((f) => f.nivel === 'Professor');
+// Graduações por modalidade (paralelas à faixa) — editáveis em Configurações
+export const GRAD_MODALIDADES_PADRAO = [
+  { modalidade: 'Tai Chi Chuan', icone: '☯️', niveis: ['TCQ Iniciante', 'TCQ Intermediário', 'TCQ Avançado'] },
+  { modalidade: 'Sanda', icone: '🥊', niveis: ['Sanda Iniciante', 'Sanda Intermediário', 'Sanda Avançado'] },
+];
 // Taxa de exame por faixa a conquistar — tabela oficial Mao Chuen 2026 (editável em Configurações)
 export const TAXAS_EXAME_2026 = {
   Branca: 80,

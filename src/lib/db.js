@@ -4,7 +4,7 @@
 // ficam no banco: o aluno só recebe os próprios dados, o professor os da filial, o admin tudo.
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
-import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026 } from './seed';
+import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026, GRAD_MODALIDADES_PADRAO } from './seed';
 import { valorPlano, resumoPlano, temPlanos } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
@@ -433,6 +433,16 @@ export function promoverAProfessor(db, alunoId, { titulo = 'Laoshi', filialId, r
 // ---------- Regras de negócio ----------
 export const faixaNome = (db, idx) => db.config.faixas[idx]?.nome || '—';
 export const faixaNivel = (db, idx) => db.config.faixas[idx]?.nivel || '—';
+
+/** Trilhas de graduação por modalidade (ex.: TCQ e Sanda) */
+export const gradModalidades = (db) => (db.config.gradModalidades?.length ? db.config.gradModalidades : GRAD_MODALIDADES_PADRAO);
+/** Níveis do aluno nas modalidades: [{ modalidade, icone, nivel, nome }] */
+export function nivelsModalidade(db, aluno) {
+  const g = aluno?.gradModalidades || {};
+  return gradModalidades(db)
+    .filter((t) => g[t.modalidade] != null && t.niveis[g[t.modalidade]])
+    .map((t) => ({ modalidade: t.modalidade, icone: t.icone || '🎖️', nivel: g[t.modalidade], nome: t.niveis[g[t.modalidade]] }));
+}
 /** Taxa do exame para conquistar a faixa `idx` (tabela por faixa; sem valor na tabela, usa a taxa padrão) */
 export const taxasExame = (db) => db.config.taxasExame || TAXAS_EXAME_2026;
 export function taxaExameFaixa(db, idx) {
