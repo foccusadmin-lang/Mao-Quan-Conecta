@@ -21,22 +21,30 @@ export const combosAtivos = (f) => COMBOS.filter((n) => +f?.planos?.familia?.[n]
 /** Soma das modalidades escolhidas (sem desconto) */
 export const somaModalidades = (f, nomes = []) => modalidadesOfertadas(f).filter((m) => nomes.includes(m.nome)).reduce((s, m) => s + m.valor, 0);
 
+/** Base "qualquer modalidade": a primeira (a de maior valor) paga o valor dela, as demais pagam só o adicional */
+export const BASE_QUALQUER = '*';
+
 /**
- * Condição especial da filial (ex.: Sede): quem escolhe a modalidade-base (Tradicional)
- * paga o valor dela + um adicional fixo por cada outra modalidade escolhida.
- * filial.planos.combinada = { ativa, base: 'Tradicional', adicional: 50 }
+ * Condição especial da filial (ex.: Sede): a modalidade-base paga o valor dela
+ * + um adicional fixo por cada outra modalidade escolhida.
+ * filial.planos.combinada = { ativa, base: 'Tradicional' | '*', adicional: 50 }
  */
 export const condicaoCombinada = (f) => {
   const c = f?.planos?.combinada;
-  return c?.ativa && c.base && +c.adicional >= 0 && modalidadesOfertadas(f).some((m) => m.nome === c.base) ? { base: c.base, adicional: +c.adicional } : null;
+  if (!c?.ativa || !c.base || !(+c.adicional >= 0)) return null;
+  if (c.base !== BASE_QUALQUER && !modalidadesOfertadas(f).some((m) => m.nome === c.base)) return null;
+  return { base: c.base, qualquer: c.base === BASE_QUALQUER, adicional: +c.adicional };
 };
+
+/** A condição especial vale para esta escolha de modalidades? */
+export const condicaoAplica = (cc, nomes = []) => !!cc && nomes.length > 0 && (cc.qualquer || nomes.includes(cc.base));
 
 /** Valor das modalidades escolhidas, aplicando a condição especial quando houver */
 export function valorModalidades(f, nomes = []) {
   const ofertadas = modalidadesOfertadas(f).filter((m) => nomes.includes(m.nome));
   const cc = condicaoCombinada(f);
-  if (cc && ofertadas.some((m) => m.nome === cc.base)) {
-    const vBase = ofertadas.find((m) => m.nome === cc.base).valor;
+  if (condicaoAplica(cc, ofertadas.map((m) => m.nome))) {
+    const vBase = cc.qualquer ? Math.max(...ofertadas.map((m) => m.valor)) : ofertadas.find((m) => m.nome === cc.base).valor;
     return vBase + cc.adicional * (ofertadas.length - 1);
   }
   return ofertadas.reduce((s, m) => s + m.valor, 0);

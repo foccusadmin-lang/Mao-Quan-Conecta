@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDB, setDB, flush, departamentos, notify, mensalidadeDoAluno } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { brl, monthISO } from '../lib/utils';
-import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada } from '../lib/planos';
+import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER } from '../lib/planos';
 import { Card, Field, toast } from './ui';
 
 // ---------------------------------------------------------------------------
@@ -26,11 +26,12 @@ export function PlanosFilialEditor({ filial }) {
   const muda = (nome, patch) => setP({ ...p, modalidades: { ...p.modalidades, [nome]: { ...p.modalidades[nome], ...patch } } });
   const previa = { ...filial, planos: p };
   const ofertadas = modalidadesOfertadas(previa);
+  const valorBasePrevia = p.combinada.base === BASE_QUALQUER ? Math.max(0, ...ofertadas.map((m) => m.valor)) : +p.modalidades[p.combinada.base]?.valor || 0;
 
   const salvar = () => {
     if (Object.values(p.modalidades).some((m) => m.ativa && !(+m.valor > 0))) return toast('Informe o valor de cada modalidade oferecida.');
     if (p.pacote.ativo && !(+p.pacote.valor > 0)) return toast('Informe o valor promocional do pacote.');
-    if (p.combinada.ativa && !p.modalidades[p.combinada.base]?.ativa) return toast('A modalidade-base da condição especial precisa estar oferecida.');
+    if (p.combinada.ativa && p.combinada.base !== BASE_QUALQUER && !p.modalidades[p.combinada.base]?.ativa) return toast('A modalidade-base da condição especial precisa estar oferecida.');
     if (p.combinada.ativa && !(+p.combinada.adicional >= 0 && p.combinada.adicional !== '')) return toast('Informe o valor adicional por modalidade.');
     const limpo = {
       modalidades: Object.fromEntries(Object.entries(p.modalidades).filter(([, m]) => m.ativa || +m.valor > 0).map(([k, m]) => [k, { ativa: !!m.ativa, valor: +m.valor || 0 }])),
@@ -72,6 +73,7 @@ export function PlanosFilialEditor({ filial }) {
             <div className="form-grid mt">
               <Field label="Modalidade-base">
                 <select value={p.combinada.base} onChange={(e) => setP({ ...p, combinada: { ...p.combinada, base: e.target.value } })}>
+                  <option value={BASE_QUALQUER}>Qualquer modalidade (a primeira paga o valor dela)</option>
                   {Object.keys(p.modalidades).map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               </Field>
@@ -79,9 +81,9 @@ export function PlanosFilialEditor({ filial }) {
                 <input type="number" min="0" step="0.01" value={p.combinada.adicional} onChange={(e) => setP({ ...p, combinada: { ...p.combinada, adicional: e.target.value } })} placeholder="50" />
               </Field>
             </div>
-            {+p.modalidades[p.combinada.base]?.valor > 0 && p.combinada.adicional !== '' && (
+            {valorBasePrevia > 0 && p.combinada.adicional !== "" && (
               <p className="xs muted" style={{ marginBottom: 0 }}>
-                {[1, 2, 3, 4].filter((n) => n <= Math.max(1, ofertadas.length)).map((n) => `${n === 1 ? p.combinada.base : `${p.combinada.base} + ${n - 1}`}: ${brl(+p.modalidades[p.combinada.base].valor + (n - 1) * +p.combinada.adicional)}`).join(' · ')}
+                {[1, 2, 3, 4, 5].filter((n) => n <= Math.max(1, ofertadas.length)).map((n) => `${n} modalidade${n > 1 ? "s" : ""}${p.combinada.base === BASE_QUALQUER ? "" : n === 1 ? ` (${p.combinada.base})` : ` (${p.combinada.base} + ${n - 1})`}: ${brl(valorBasePrevia + (n - 1) * +p.combinada.adicional)}`).join(" · ")}
               </p>
             )}
           </>
@@ -127,6 +129,13 @@ export function PlanosFilialEditor({ filial }) {
 export function EscolhaPlano({ filial, value, onChange }) {
   const ofertadas = modalidadesOfertadas(filial);
   const cc = condicaoCombinada(filial);
+  // Rótulo do preço de cada modalidade: com a condição especial valendo, as adicionais mostram "+ R$ 50"
+  const rotuloModalidade = (m, on) => {
+    const escolhidas = plano.modalidades || [];
+    if (!condicaoAplica(cc, escolhidas)) return ` · ${brl(m.valor)}`;
+    if (cc.qualquer) return on ? '' : ` · + ${brl(cc.adicional)}`;
+    return m.nome === cc.base ? ` · ${brl(m.valor)}` : ` · + ${brl(cc.adicional)}`;
+  };
   const combos = combosAtivos(filial);
   const plano = value || { tipo: 'modalidades', modalidades: [] };
   const muda = (patch) => onChange({ ...plano, ...patch });
@@ -172,14 +181,14 @@ export function EscolhaPlano({ filial, value, onChange }) {
             const on = (plano.modalidades || []).includes(m.nome);
             return (
               <button key={m.nome} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => alterna(m.nome)}>
-                {on ? '✓ ' : ''}{m.nome}{plano.tipo === 'modalidades' ? ` · ${cc && (plano.modalidades || []).includes(cc.base) && m.nome !== cc.base ? `+ ${brl(cc.adicional)}` : brl(m.valor)}` : ''}
+                {on ? "✓ " : ""}{m.nome}{plano.tipo === "modalidades" ? rotuloModalidade(m, on) : ""}
               </button>
             );
           })}
         </div>
       )}
       {plano.tipo === 'modalidades' && cc && (
-        <div className="alert gold small">⭐ <div><b>Condição especial desta filial:</b> {cc.base} {brl(ofertadas.find((m) => m.nome === cc.base)?.valor || 0)} + <b>{brl(cc.adicional)}</b> por cada modalidade adicional.</div></div>
+        <div className="alert gold small">⭐ <div><b>Condição especial desta filial:</b> {cc.qualquer ? <>a primeira modalidade paga o valor dela ({brl(Math.max(...ofertadas.map((m) => m.valor)))})</> : <>{cc.base} {brl(ofertadas.find((m) => m.nome === cc.base)?.valor || 0)}</>} + <b>{brl(cc.adicional)}</b> por cada modalidade adicional.</div></div>
       )}
       {plano.tipo === 'pacote' && <div className="small">Inclui: <b>{ofertadas.map((m) => m.nome).join(', ')}</b></div>}
 
