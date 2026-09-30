@@ -53,7 +53,7 @@ export default function Professores() {
         if (f && ehResponsavel(f, id)) f.equipe = responsaveisFilial(f).map((r) => (r.professorId === id ? { ...r, departamentos: [...(data.modalidades || [])] } : r));
       }
       // Filiais adicionais: entra na equipe de responsáveis de cada uma; sai das que foram desmarcadas
-      const extras = (data.filiaisExtras || []).filter((x) => x && x !== data.filialId);
+      const extras = [...new Set((data.filiaisExtras || []).filter((x) => x && x !== data.filialId))];
       const alvo = d.professores.find((p) => p.id === id);
       alvo.filiaisExtras = extras;
       if (!extras.length) delete alvo.filiaisExtras;
@@ -151,24 +151,35 @@ export default function Professores() {
                   <FaixaOptions />
                 </select>
               </Field>
-              <Field label="Filial designada">
-                <select value={edit.filialId} onChange={(e) => setEdit({ ...edit, filialId: e.target.value })}>
+              <Field label="Filial designada (principal)">
+                <select value={edit.filialId} onChange={(e) => setEdit({ ...edit, filialId: e.target.value, filiaisExtras: (edit.filiaisExtras || []).filter((x) => x !== e.target.value) })}>
                   <option value="">— Nenhuma —</option>
                   {db.filiais.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
               </Field>
-              <Field label="Filiais adicionais" style={{ gridColumn: '1/-1' }} hint="Para quem responde por mais de uma filial (ex.: Sede e Engenho Novo). No painel ele escolhe no topo em qual filial está trabalhando.">
-                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                  {db.filiais.filter((f) => f.id !== edit.filialId).map((f) => {
-                    const on = (edit.filiaisExtras || []).includes(f.id);
-                    return (
-                      <button key={f.id} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => setEdit({ ...edit, filiaisExtras: on ? edit.filiaisExtras.filter((x) => x !== f.id) : [...(edit.filiaisExtras || []), f.id] })}>
-                        {on ? '✓ ' : ''}{f.nome}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Field>
+              <div style={{ gridColumn: '1/-1' }}>
+                {(edit.filiaisExtras || []).map((fid, i) => {
+                  const usadas = [edit.filialId, ...(edit.filiaisExtras || []).filter((_, j) => j !== i)];
+                  const muda = (v) => setEdit({ ...edit, filiaisExtras: edit.filiaisExtras.map((x, j) => (j === i ? v : x)) });
+                  return (
+                    <Field key={i} label={`Outra filial designada ${i + 2}`}>
+                      <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                        <select value={fid} onChange={(e) => muda(e.target.value)} style={{ flex: 1 }}>
+                          <option value="">Selecione a filial…</option>
+                          {db.filiais.filter((f) => f.id === fid || !usadas.includes(f.id)).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                        </select>
+                        <button type="button" className="btn sm ghost icon" aria-label="Remover esta filial" title="Remover esta filial" onClick={() => setEdit({ ...edit, filiaisExtras: edit.filiaisExtras.filter((_, j) => j !== i) })}>✕</button>
+                      </div>
+                    </Field>
+                  );
+                })}
+                {edit.filialId && (
+                  <button type="button" className="btn sm dark" onClick={() => setEdit({ ...edit, filiaisExtras: [...(edit.filiaisExtras || []), ''] })}>
+                    + Adicionar outra filial designada
+                  </button>
+                )}
+                <div className="xs muted" style={{ marginTop: 4 }}>O professor fica responsável por todas as filiais designadas. No painel dele, escolhe no topo em qual filial está trabalhando.</div>
+              </div>
               <Field label="Modalidades sob responsabilidade" style={{ gridColumn: '1/-1' }} hint="O professor vê só os alunos dessas modalidades na filial. “Geral” = responsável por todas as modalidades. Sem nenhuma marcada, vê todos os alunos da filial.">
                 <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                   {departamentos(db).map((m) => {
