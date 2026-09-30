@@ -106,7 +106,7 @@ function ArquivoComprovante({ c }) {
   );
 }
 
-const ACOES = { comprovante_enviado: '📎 Comprovante enviado', comprovante_recusado: '⚠️ Comprovante recusado', confirmado: '✅ Pagamento confirmado' };
+const ACOES = { comprovante_enviado: '📎 Comprovante enviado', comprovante_recusado: '⚠️ Comprovante recusado', confirmado: '✅ Pagamento confirmado', cobranca_editada: '✏️ Cobrança editada', valor_ajustado: '💲 Valor ajustado', lancado: '↩ Lançada (pendência anterior)', isencao: '🎓 Isenção' };
 
 /** Conferência e auditoria de um pagamento (Central / professor responsável) */
 export function ConferenciaPagamento({ pagamentoId, user, nomePessoa, onFeito, podeDecidir = true }) {

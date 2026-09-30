@@ -8,7 +8,7 @@ const COR = { branca: '#f5f5f5', vermelha: '#d0121b', cinza: '#9a9a9a', amarela:
 const fx = (nivel, nome, cor, extra = {}) => ({ nivel, nome, cor, ponta: null, hanzi: null, ...extra });
 export const NIVEIS = ['Iniciante', 'Intermediária', 'Avançado', 'Professor'];
 export const FAIXAS_PADRAO = [
-  fx('Iniciante', 'Praticante', '#e7e2dc', { semFaixa: true }), // quem ainda não tem faixa
+  fx('Iniciante', 'Neutra', '#e7e2dc', { semFaixa: true }), // quem ainda não tem faixa
   fx('Iniciante', 'Branca Ponta Vermelha', COR.branca, { ponta: COR.vermelha }),
   fx('Iniciante', 'Branca', COR.branca),
   fx('Iniciante', 'Branca Ponta Cinza', COR.branca, { ponta: COR.cinza }),

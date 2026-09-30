@@ -307,3 +307,80 @@ export function ValorMensalidade({ aluno, user }) {
     </Card>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Financeiro: editar uma cobrança em aberto (valor/vencimento) e, se quiser,
+// salvar o valor como mensalidade personalizada do aluno para os próximos meses
+// ---------------------------------------------------------------------------
+export function EditarCobranca({ pagamentoId, user, onFeito }) {
+  const db = useDB();
+  const p = db.pagamentos.find((x) => x.id === pagamentoId);
+  const aluno = p && db.alunos.find((a) => a.id === p.pessoaId);
+  const m = aluno ? mensalidadeDoAluno(db, aluno) : null;
+  const [valor, setValor] = useState(p ? String(p.valor) : '');
+  const [vencimento, setVencimento] = useState(p?.vencimento || '');
+  const [motivo, setMotivo] = useState(aluno?.mensalidadePersonalizada?.motivo || '');
+  const [fixar, setFixar] = useState(p?.tipo === 'mensalidade' && !!aluno);
+  if (!p) return null;
+  if (p.status !== 'pendente') return <div className="alert ok small">Esta cobrança já foi paga e não pode ser editada.</div>;
+
+  const novo = valor === '' ? NaN : +(+valor).toFixed(2);
+  const ehPadrao = m && novo === +(+m.padrao).toFixed(2);
+
+  const salvar = () => {
+    if (!(novo >= 0)) return toast('Informe um valor válido.');
+    if (!vencimento) return toast('Informe o vencimento.');
+    if (!ehPadrao && !motivo.trim() && (fixar || novo !== p.valor)) return toast('Informe o motivo do valor diferente (ex.: bolsa parcial, benefício).');
+    const agora = new Date().toISOString();
+    setDB((d) => {
+      const x = d.pagamentos.find((y) => y.id === p.id);
+      const antes = { valor: x.valor, vencimento: x.vencimento };
+      x.valor = novo;
+      x.vencimento = vencimento;
+      if (p.tipo === 'mensalidade') {
+        if (ehPadrao) (delete x.personalizada, delete x.valorPadrao);
+        else Object.assign(x, { personalizada: true, valorPadrao: m?.padrao });
+      }
+      x.auditoria = [...(x.auditoria || []), { em: agora, por: user.nome, acao: 'cobranca_editada', motivo: `${brl(antes.valor)} → ${brl(novo)}${antes.vencimento !== vencimento ? ` · vencimento ${antes.vencimento} → ${vencimento}` : ''}${motivo.trim() ? ` · ${motivo.trim()}` : ''}` }];
+      if (fixar && aluno) {
+        const a = d.alunos.find((y) => y.id === aluno.id);
+        if (ehPadrao) delete a.mensalidadePersonalizada;
+        else a.mensalidadePersonalizada = { valor: novo, motivo: motivo.trim(), por: user.nome, em: agora };
+        a.historicoMensalidade = [...(a.historicoMensalidade || []), { em: agora, por: user.nome, valor: novo, padrao: m.padrao, personalizada: !ehPadrao, motivo: ehPadrao ? 'Voltou ao valor padrão' : motivo.trim() }];
+      }
+      notify(d, p.pessoaId, 'Cobrança atualizada', `${x.descricao}: ${brl(novo)}, vencimento ${new Date(vencimento + 'T12:00').toLocaleDateString('pt-BR')}.`);
+    });
+    toast('Cobrança atualizada.');
+    onFeito?.();
+  };
+
+  return (
+    <div className="col">
+      <div className="card" style={{ padding: 12 }}>
+        <div style={{ fontWeight: 700 }}>{aluno?.nome || '—'}</div>
+        <div className="small">{p.descricao}</div>
+        {m && <div className="xs muted">Mensalidade padrão da academia para este aluno: <b>{brl(m.padrao)}</b>{m.personalizada ? ` · hoje personalizada em ${brl(m.valor)} (${m.motivo || '—'})` : ''}</div>}
+      </div>
+      {p.analise === 'enviado' && <div className="alert gold small">Esta cobrança já tem comprovante em conferência. Confira o valor pago antes de alterar.</div>}
+      <div className="form-grid">
+        <Field label="Valor desta cobrança (R$)" hint={m && novo < m.padrao ? `Desconto de ${brl(m.padrao - novo)} sobre o padrão` : ''}>
+          <input type="number" min="0" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} />
+        </Field>
+        <Field label="Vencimento"><input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} /></Field>
+        <Field label="Motivo" style={{ gridColumn: '1/-1' }}><input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: bolsa parcial, benefício social, acordo com o responsável" /></Field>
+      </div>
+      {m && (
+        <div className="row" style={{ gap: 6 }}>
+          <button type="button" className="btn sm ghost" onClick={() => setValor(String(m.padrao))}>Usar valor padrão ({brl(m.padrao)})</button>
+        </div>
+      )}
+      {p.tipo === 'mensalidade' && aluno && (
+        <label className="check small">
+          <input type="checkbox" checked={fixar} onChange={(e) => setFixar(e.target.checked)} />
+          {ehPadrao ? 'Voltar o aluno ao valor padrão também nas próximas mensalidades' : 'Salvar como mensalidade personalizada do aluno (próximas mensalidades com este valor)'}
+        </label>
+      )}
+      <div><button className="btn" onClick={salvar}>Salvar alterações</button></div>
+    </div>
+  );
+}

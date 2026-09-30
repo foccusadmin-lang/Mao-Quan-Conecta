@@ -63,7 +63,7 @@ export default function PrimeiroAcesso() {
               {db.filiais.filter((x) => x.ativa).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </select>
           </Field>
-          <Field label="Graduação atual" hint="Se você ainda não tem faixa, deixe “Praticante”. O professor confere na aprovação.">
+          <Field label="Graduação atual" hint="Se você ainda não tem faixa, deixe “Neutra”. O professor confere na aprovação.">
             <select value={f.faixaIdx} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
               <FaixaOptions />
             </select>

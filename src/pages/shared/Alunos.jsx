@@ -147,7 +147,7 @@ export default function Alunos({ user }) {
               {db.alunos.find((x) => x.id === aprovar.id)?.faixaInformada ? (
                 <div>O aluno informou no cadastro a faixa <b>{faixaNome(db, db.alunos.find((x) => x.id === aprovar.id).faixaIdx)}</b>. Confira e corrija abaixo se necessário antes de aprovar.</div>
               ) : (
-                <div>O aluno se cadastrou como <b>Praticante</b> (sem faixa). Se ele <b>já é graduado</b>, selecione abaixo a faixa real dele antes de aprovar.</div>
+                <div>O aluno se cadastrou com a faixa <b>Neutra</b> (sem faixa). Se ele <b>já é graduado</b>, selecione abaixo a faixa real dele antes de aprovar.</div>
               )}
             </div>
             <Field label="Graduação do aluno">

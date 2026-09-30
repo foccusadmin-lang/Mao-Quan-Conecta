@@ -3,7 +3,7 @@ import { useDB, setDB, notify, professorVeAluno, confirmarPagamento, rotinaFinan
 import { brl, fmtDate, todayISO, monthISO, fmtMonth, uid, waLink, addDays, maskChavePix } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Stat, Tabs, StatusBadge, toast, Empty, Search, useConfirm } from '../../components/ui';
 import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
-import { PlanosFilialEditor } from '../../components/Planos';
+import { PlanosFilialEditor, EditarCobranca } from '../../components/Planos';
 import { ConferenciaPagamento, SeloComprovante } from '../../components/Comprovante';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 
@@ -20,6 +20,7 @@ export default function Financeiro({ user }) {
   const [pix, setPix] = useState(null);
   const [conferir, setConferir] = useState(null);
   const [retro, setRetro] = useState(false);
+  const [editar, setEditar] = useState(null);
   const [ask, confirmEl] = useConfirm();
   const hoje = todayISO();
   const { rec: recMinhaFilial } = useRecebedor(isAdmin ? null : user.filialId);
@@ -45,6 +46,33 @@ export default function Financeiro({ user }) {
   const chaveLembrete = (p) => {
     const rec = p.tipo === 'mensalidade' ? (isAdmin ? recebedorLocal(db, p.filialId) : recMinhaFilial) : null;
     return rec ? `${maskChavePix(rec.tipo, rec.chave)} (${rec.titular || rec.nome})` : db.config.pixChave;
+  };
+
+  /** Torna o aluno isento (bolsista 100%): esta mensalidade é quitada como isenção e as próximas saem como bolsa */
+  const tornarIsento = (p) => {
+    const a = db.alunos.find((x) => x.id === p.pessoaId);
+    if (!a) return toast('Só alunos podem ser definidos como isentos.');
+    ask(
+      `Definir ${a.nome} como ISENTO (bolsista 100%)? A cobrança “${p.descricao}” (${brl(p.valor)}) será quitada como isenção, e as próximas mensalidades sairão como “Bolsista 100%”.`,
+      () => {
+        const agora = new Date().toISOString();
+        setDB((d) => {
+          const x = d.alunos.find((y) => y.id === a.id);
+          x.isento = true;
+          const pg = d.pagamentos.find((y) => y.id === p.id);
+          if (pg && pg.status === 'pendente') {
+            Object.assign(pg, {
+              valorOriginal: pg.valor, valor: 0, status: 'pago', pagoEm: agora, metodo: 'isencao', isencao: 'bolsa',
+              confirmadoPor: user.nome, descricao: `${pg.descricao.split(' — ')[0]} — Bolsista 100%`,
+            });
+            pg.auditoria = [...(pg.auditoria || []), { em: agora, por: user.nome, acao: 'isencao', motivo: 'Aluno definido como isento (bolsista 100%)' }];
+          }
+          notify(d, a.id, 'Isenção concedida 🎓', 'Você agora é bolsista 100%: sua mensalidade está isenta.');
+        });
+        toast(`${a.nome} agora é isento(a).`);
+      },
+      'Tornar isento'
+    );
   };
 
   const lembrete = (p) =>
@@ -175,6 +203,10 @@ export default function Financeiro({ user }) {
                         <button className={`btn sm ${p.analise === 'enviado' ? 'ok' : 'ghost'}`} title="Conferir comprovante e auditoria" onClick={() => setConferir(p.id)}>{p.comprovantes?.length ? '👁 Ver comprovante' : '🔎 Conferir'}</button>{' '}
                         <button className="btn sm ok" onClick={() => confirmar(p, 'pix')}>✔ Confirmar</button>{' '}
                         <button className="btn sm ghost" title="Recebido em mãos" onClick={() => confirmar(p, 'dinheiro')}>💵</button>{' '}
+                        <button className="btn sm ghost" title="Editar valor e vencimento desta mensalidade" onClick={() => setEditar(p.id)}>✏️ Editar valor</button>{' '}
+                        {p.tipo === 'mensalidade' && db.alunos.some((a) => a.id === p.pessoaId && !a.isento) && (
+                          <><button className="btn sm ghost" title="Tornar isento (bolsista 100%)" aria-label="Tornar isento" onClick={() => tornarIsento(p)}>🎓</button>{' '}</>
+                        )}
                         <button className="btn sm ghost" title="Lembrete WhatsApp" onClick={() => lembrete(p)}>📲</button>{' '}
                         <button className="btn sm ghost" title="QR PIX" onClick={() => setPix(p)}>▦</button>{' '}
                         {isAdmin && <button className="btn sm ghost" title="Excluir" onClick={() => ask('Excluir esta cobrança?', () => setDB((d) => { d.pagamentos = d.pagamentos.filter((x) => x.id !== p.id); }), 'Excluir')}>🗑</button>}
@@ -282,6 +314,10 @@ export default function Financeiro({ user }) {
           </Card>
         </div>
       )}
+
+      <Modal open={!!editar} onClose={() => setEditar(null)} title="✏️ Editar mensalidade">
+        {editar && <EditarCobranca pagamentoId={editar} user={user} onFeito={() => setEditar(null)} />}
+      </Modal>
 
       <Modal open={retro} onClose={() => setRetro(false)} title="Cobrar meses anteriores" wide>
         {retro && <CobrancaRetroativa user={user} alunos={alunosEscopo} onFeito={() => (setRetro(false), setTab('abertos'))} />}

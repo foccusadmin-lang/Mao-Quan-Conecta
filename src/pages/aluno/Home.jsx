@@ -32,12 +32,15 @@ export default function AlunoHome({ user }) {
 
       {fin.bloqueado && (
         <Link to="pagamentos" className="alert red mb" style={{ textDecoration: 'none' }}>
-          ⛔ <div className="grow"><b>Acesso restrito por inadimplência.</b> Material didático e inscrição em exames estão suspensos até a confirmação do pagamento.</div> Pagar →
+          ⛔ <div className="grow"><b>Acesso restrito por inadimplência.</b> Material didático e inscrição em exames estão suspensos até a confirmação do pagamento. <b>Já pagou?</b> Envie o comprovante em Pagamentos → “📎 Já paguei”.</div> Resolver →
         </Link>
       )}
       {!fin.bloqueado && fin.emAberto.length > 0 && (
         <Link to="pagamentos" className="alert gold mb" style={{ textDecoration: 'none' }}>
-          🧾 <div className="grow">{fin.emAberto[0].descricao} — {brl(fin.emAberto[0].valor)} · vence em {fmtDate(fin.emAberto[0].vencimento)}</div> →
+          🧾 <div className="grow">
+            {fin.emAberto[0].descricao} — {brl(fin.emAberto[0].valor)} · {fin.emAberto[0].vencimento < hoje ? 'venceu' : 'vence'} em {fmtDate(fin.emAberto[0].vencimento)}
+            {fin.emAberto.some((p) => p.analise === 'enviado') ? ' · comprovante em conferência' : ' · já pagou? envie o comprovante'}
+          </div> →
         </Link>
       )}
 
