@@ -389,3 +389,15 @@ tr:last-child td { border-bottom: 0; }
 .vitrine-nome { font-family: var(--brush); font-weight: 400; font-size: clamp(30px, 6vw, 48px); line-height: 1.05; margin: 0; }
 .vitrine-sec { max-width: 1000px; margin: 0 auto; padding: 22px 16px; }
 .vitrine-sec h2 { font-family: var(--brush); font-weight: 400; font-size: 26px; }
+
+/* Busca de aluno no topo (professor e Central) */
+.busca-aluno { position: relative; flex: 0 1 280px; min-width: 0; }
+.busca-aluno input { width: 100%; padding: 8px 12px; border-radius: 99px; font-size: 14px; }
+.busca-aluno-lista { position: absolute; right: 0; top: calc(100% + 6px); width: min(380px, 92vw); max-height: 70vh; overflow: auto; background: var(--card, #fff); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18); z-index: 70; padding: 6px; }
+.busca-aluno-item { display: flex; gap: 10px; align-items: center; width: 100%; padding: 8px; border: 0; background: transparent; border-radius: 10px; cursor: pointer; font: inherit; color: inherit; }
+.busca-aluno-item.sel, .busca-aluno-item:hover { background: #f4efea; }
+@media (max-width: 640px) {
+  .busca-aluno { flex-basis: 130px; }
+  .busca-aluno input:focus { position: fixed; left: 12px; right: 12px; top: calc(10px + env(safe-area-inset-top)); width: auto; z-index: 71; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2); }
+  .busca-aluno-lista { position: fixed; left: 12px; right: 12px; top: calc(58px + env(safe-area-inset-top)); width: auto; }
+}

@@ -4,6 +4,7 @@ import { useDB, setDB, setSession, notificacoesDe, temRecurso, setFilialAtiva } 
 import { fmtDateTime } from '../lib/utils';
 import { Avatar, Modal, Empty } from './ui';
 import { WhatsFab } from './shared';
+import { BuscaAluno } from './BuscaAluno';
 
 export const NAVS = {
   admin: [
@@ -120,8 +121,9 @@ export default function Layout({ user }) {
         <header className="topbar">
           <button className="btn icon ghost burger" onClick={() => setOpen(true)} aria-label="Menu">☰</button>
           <h1>{current[2]}</h1>
+          {(user.role === 'admin' || user.role === 'professor') && <BuscaAluno user={user} />}
           {user.role === 'professor' && user.filiais?.length > 1 && (
-            <label className="row" style={{ gap: 6, marginLeft: 'auto', flexWrap: 'nowrap' }} title="Você responde por mais de uma filial: escolha em qual está trabalhando">
+            <label className="row" style={{ gap: 6, flexWrap: "nowrap" }} title="Você responde por mais de uma filial: escolha em qual está trabalhando">
               <span className="xs muted hide-sm">Filial:</span>
               <select value={user.filialId} onChange={(e) => setFilialAtiva(e.target.value)} style={{ maxWidth: 220, padding: '6px 10px', fontWeight: 600 }}>
                 {user.filiais.map((fid) => <option key={fid} value={fid}>{db.filiais.find((f) => f.id === fid)?.nome || fid}</option>)}

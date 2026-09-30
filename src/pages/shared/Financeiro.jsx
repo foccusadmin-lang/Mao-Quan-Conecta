@@ -251,7 +251,7 @@ export default function Financeiro({ user }) {
 
       {tab === 'isencoes' && (
         <Card title="Isenções individuais">
-          {alunosEscopo.map((a) => (
+          {alunosEscopo.filter((a) => (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())).map((a) => (
             <label key={a.id} className="list-item check">
               <input type="checkbox" checked={!!a.isento} disabled={!!a.isentoPor} onChange={(e) => setDB((d) => { const x = d.alunos.find((y) => y.id === a.id); x.isento = e.target.checked; if (e.target.checked) notify(d, a.id, 'Isenção concedida', 'Você está isento(a) da mensalidade.'); })} />
               <div className="grow">{a.nome}<div className="xs muted">{filialNome(db, a.filialId)}{a.isentoPor ? ` · ${a.isentoMotivo || 'Plano família'}` : ''}</div></div>
@@ -271,7 +271,7 @@ export default function Financeiro({ user }) {
 
       {tab === 'professores' && isAdmin && (
         <Card title="Filiação anual dos professores (à vista, 3x ou 6x)">
-          {db.professores.map((p) => (
+          {db.professores.filter((p) => p.nome.toLowerCase().includes(q.toLowerCase())).map((p) => (
             <div key={p.id} className="list-item" style={{ flexWrap: 'wrap' }}>
               <div className="grow">
                 <div style={{ fontWeight: 600 }}>{p.titulo} {p.nome}</div>

@@ -1,4 +1,5 @@
-﻿import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
@@ -17,6 +18,25 @@ export default function Alunos({ user }) {
   const [novo, setNovo] = useState(null);
   const [aprovar, setAprovar] = useState(null);
   const [ask, confirmEl] = useConfirm();
+  const [params, setParams] = useSearchParams();
+
+  // Professor que troca de filial no topo: a lista acompanha
+  useEffect(() => {
+    if (!isAdmin) setFilial(user.filialId);
+  }, [user.filialId]);
+
+  // Vindo da busca do topo (?aluno=id): abre a ficha do aluno
+  useEffect(() => {
+    const id = params.get('aluno');
+    if (!id) return;
+    if (db.alunos.some((a) => a.id === id)) {
+      setFiltro('todos');
+      if (isAdmin) setFilial('');
+      setAberto(id);
+    }
+    params.delete('aluno');
+    setParams(params, { replace: true });
+  }, [params]);
 
   const liberar = () => {
     const email = (novo.email || '').trim().toLowerCase();

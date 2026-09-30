@@ -7,7 +7,7 @@
 // aluno.plano = { tipo: 'modalidades' | 'pacote' | 'familia', modalidades: [], combo, familia: { beneficiarios: [{ nome, email, alunoId, cadastrado }] } }
 import { brl } from './utils';
 
-export const COMBOS = [2, 3, 4];
+export const COMBOS = [2, 3, 4, 5, 6];
 
 export const modalidadesOfertadas = (f) =>
   Object.entries(f?.planos?.modalidades || {})

@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, filialNome, taxaExameFaixa } from '../../lib/db';
 import { uid, todayISO, addDays, fmtDate, brl } from '../../lib/utils';
-import { PageHead, Card, Avatar, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty } from '../../components/ui';
+import { PageHead, Card, Avatar, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search } from '../../components/ui';
 
 export default function Graduacao({ user }) {
   const db = useDB();
   const isAdmin = user.role === 'admin';
   const [tab, setTab] = useState('avaliar');
+  const [q, setQ] = useState('');
   const [ask, confirmEl] = useConfirm();
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial.</Empty>;
 
-  const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin || (a.filialId === user.filialId && professorVeAluno(db, user, a)))).sort((a, b) => a.nome.localeCompare(b.nome));
+  const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin || (a.filialId === user.filialId && professorVeAluno(db, user, a))) && (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.nome.localeCompare(b.nome));
 
   const avaliar = (a, status) =>
     setDB((d) => {
@@ -50,7 +51,9 @@ export default function Graduacao({ user }) {
 
   return (
     <>
-      <PageHead title="Graduação & Pré-Exame" sub="Checklist Apto / Necessita Reforço antes de gerar a taxa de exame" />
+      <PageHead title="Graduação & Pré-Exame" sub="Checklist Apto / Necessita Reforço antes de gerar a taxa de exame">
+        <Search value={q} onChange={setQ} placeholder="Buscar aluno" />
+      </PageHead>
       <Tabs tabs={[['avaliar', '📋 Pré-avaliação'], ['exame', '🎖️ Inscritos / Aprovação'], ['propostas', `📨 Propostas (${propostas.length})`]]} value={tab} onChange={setTab} />
 
       {tab === 'avaliar' && (
