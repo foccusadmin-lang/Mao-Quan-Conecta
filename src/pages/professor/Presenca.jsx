@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB, frequencia, notify, professorVeAluno } from '../../lib/db';
+import { useDB, setDB, frequencia, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, filialNome } from '../../lib/db';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field, Search } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -13,7 +13,10 @@ export default function Presenca({ user }) {
   const [sel, setSel] = useState(null);
   const [trava, setTrava] = useState(null);
 
-  const alunos = filial ? db.alunos.filter((a) => a.filialId === filial.id && a.status === 'aprovado' && professorVeAluno(db, user, a)).sort((a, b) => a.nome.localeCompare(b.nome)) : [];
+  // Inclui quem é de outra filial mas também treina aqui (dias alternados)
+  const alunos = filial
+    ? db.alunos.filter((a) => a.status === 'aprovado' && alunoNaFilial(a, filial.id) && (filialExtraDoAluno(a, filial.id) || professorVeAluno(db, user, a))).sort((a, b) => a.nome.localeCompare(b.nome))
+    : [];
   const meusIds = new Set(alunos.map((a) => a.id)); // só os alunos das modalidades deste professor
   const [q, setQ] = useState('');
   const lista = alunos.filter((a) => (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())); // só filtra a exibição
@@ -38,7 +41,8 @@ export default function Presenca({ user }) {
       d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && meusIds.has(p.alunoId) && !marcados[p.alunoId]));
       for (const a of alunos) {
         if (!marcados[a.id]) continue;
-        const ex = d.presencas.find((p) => p.alunoId === a.id && p.data === data);
+        // Cada filial tem a sua chamada: a presença de outra filial no mesmo dia não é tocada
+        const ex = d.presencas.find((p) => p.alunoId === a.id && p.data === data && p.filialId === filial.id);
         if (ex) ex.confirmada = true;
         else d.presencas.push({ id: uid('pz'), alunoId: a.id, filialId: filial.id, data, origem: 'professor', confirmada: true });
       }
@@ -70,6 +74,7 @@ export default function Presenca({ user }) {
           {lista.length === 0 && <Empty>Nenhum aluno ativo na filial.</Empty>}
           {lista.map((a) => {
             const p = doDia.find((x) => x.alunoId === a.id);
+            const outra = !p && db.presencas.find((x) => x.alunoId === a.id && x.data === data && x.filialId !== filial.id);
             return (
               <label key={a.id} className="list-item check" style={{ alignItems: 'center' }}>
                 <input type="checkbox" checked={!!marcados[a.id]} onChange={(e) => setMarcados({ ...marcados, [a.id]: e.target.checked })} />
@@ -77,7 +82,9 @@ export default function Presenca({ user }) {
                 <div className="grow">
                   <div style={{ fontWeight: 600 }}>{a.nome} {a.saude?.restricoes && <span title={a.saude.restricoes}>⚕️</span>}</div>
                   <Faixa idx={a.faixaIdx} />
+                  {filialExtraDoAluno(a, filial.id) && <div className="xs muted">🔁 Filial principal: {filialNome(db, a.filialId)}</div>}
                 </div>
+                {outra && <span className="badge" title="Presença registrada em outra filial nesta data">📍 {filialNome(db, outra.filialId)}</span>}
                 {p?.origem === 'aluno' && <span className="badge gold">via app</span>}
                 {p?.confirmada && <span className="badge ok">confirmada</span>}
               </label>

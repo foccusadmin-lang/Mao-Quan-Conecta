@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
+import { useDB, setDB, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
 import { EscolhaPlano, salvarPlanoAluno, DiaVencimento, ValorMensalidade } from '../../components/Planos';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
+import FiliaisTreino, { limparExtras } from '../../components/FiliaisTreino';
 
 export default function Alunos({ user }) {
   const db = useDB();
@@ -51,7 +52,9 @@ export default function Alunos({ user }) {
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial. Fale com o Administrador Geral.</Empty>;
 
-  const base = db.alunos.filter((a) => (!filial || a.filialId === filial) && professorVeAluno(db, user, a));
+  const base = db.alunos.filter((a) => (!filial || a.filialId === filial || (isAdmin && alunoNaFilial(a, filial))) && professorVeAluno(db, user, a));
+  // Alunos de outras filiais que também treinam aqui (dias alternados) — aparecem na chamada; o cadastro fica com a filial principal
+  const visitantes = isAdmin ? [] : db.alunos.filter((a) => a.status === 'aprovado' && filialExtraDoAluno(a, filial)).sort((a, b) => a.nome.localeCompare(b.nome));
   const lista = base
     .filter((a) => filtro === 'todos' || a.status === filtro || (filtro === 'atletas' && a.atleta?.ativo))
     .filter((a) => (a.nome + a.email + (a.matricula || '')).toLowerCase().includes(q.toLowerCase()))
@@ -111,7 +114,12 @@ export default function Alunos({ user }) {
                           </div>
                         </div>
                       </td>
-                      {isAdmin && <td className="hide-sm">{filialNome(db, a.filialId)}</td>}
+                      {isAdmin && (
+                        <td className="hide-sm">
+                          {filialNome(db, a.filialId)}
+                          {a.filiaisExtras?.length > 0 && <div className="xs muted" title="Também treina em">+ {a.filiaisExtras.map((x) => filialNome(db, x)).join(', ')}</div>}
+                        </td>
+                      )}
                       <td><Faixa idx={a.faixaIdx} /><div><NiveisModalidade aluno={a} /></div></td>
                       <td className="hide-sm">{fr ? <span className={`badge ${fr.ok ? 'ok' : 'red'}`}>{fr.pct}%</span> : '—'}</td>
                       <td>
@@ -134,6 +142,21 @@ export default function Alunos({ user }) {
           </div>
         )}
       </Card>
+      {visitantes.length > 0 && (
+        <Card className="mt" title={`🔁 Também treinam aqui (${visitantes.length})`}>
+          <p className="xs muted" style={{ marginTop: 0 }}>Alunos de outras filiais que treinam aqui em dias alternados. Eles aparecem na sua chamada; cadastro e mensalidade ficam com a filial principal.</p>
+          {visitantes.map((a) => (
+            <div key={a.id} className="list-item">
+              <Avatar src={a.foto} name={a.nome} />
+              <div className="grow">
+                <div style={{ fontWeight: 600 }}>{a.nome} {a.saude?.restricoes && <span title={a.saude.restricoes}>⚕️</span>}</div>
+                <div className="xs muted">Filial principal: {filialNome(db, a.filialId)}</div>
+              </div>
+              <Faixa idx={a.faixaIdx} />
+            </div>
+          ))}
+        </Card>
+      )}
       {aberto && <AlunoModal id={aberto} user={user} onClose={() => setAberto(null)} ask={ask} />}
       <Modal
         open={!!aprovar}
@@ -248,6 +271,8 @@ function AlunoModal({ id, user, onClose, ask }) {
       Object.assign(x, { ...f, gradModalidades: x.gradModalidades, fotoDefinida: x.fotoDefinida, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
       if (!x.plano) delete x.plano;
       if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
+      x.filiaisExtras = limparExtras(x.filialId, f.filiaisExtras);
+      if (!x.filiaisExtras.length) delete x.filiaisExtras;
       if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
       // Graduações por modalidade (TCQ, Sanda…): registra no histórico e avisa o aluno
       if (podeGraduar) {
@@ -311,6 +336,9 @@ function AlunoModal({ id, user, onClose, ask }) {
                 </select>
               </Field>
             )}
+            <Field label="Também treina em" style={{ gridColumn: '1/-1' }}>
+              <FiliaisTreino principal={f.filialId} value={f.filiaisExtras || []} onChange={(v) => setF({ ...f, filiaisExtras: v })} />
+            </Field>
             <Field label="Graduação atual" hint={isAdmin ? '' : podeGraduar ? 'Corrija aqui a faixa real do aluno — fica registrado no histórico' : 'Somente os professores da filial do aluno ou a Central podem alterar'}>
               <select value={f.faixaIdx} disabled={!podeGraduar} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
                 <FaixaOptions />

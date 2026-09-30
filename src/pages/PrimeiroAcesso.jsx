@@ -5,6 +5,7 @@ import { maskCPF, maskRG, maskTelefone } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { temPlanos, validarPlano } from '../lib/planos';
 import { EscolhaPlano } from '../components/Planos';
+import FiliaisTreino, { limparExtras } from '../components/FiliaisTreino';
 
 /** Conta Google ainda não cadastrada: formulário de solicitação de filiação */
 export default function PrimeiroAcesso() {
@@ -23,7 +24,8 @@ export default function PrimeiroAcesso() {
     setEnviando(true);
     try {
       let id;
-      const dados = { ...f, nome: f.nome.trim(), email: auth.email, foto: auth.foto || null };
+      const dados = { ...f, nome: f.nome.trim(), email: auth.email, foto: auth.foto || null, filiaisExtras: limparExtras(f.filialId, f.filiaisExtras) };
+      if (!dados.filiaisExtras.length) delete dados.filiaisExtras;
       if (f.faixaIdx > 0) dados.faixaInformada = true; // declarada pelo aluno — o professor confere na aprovação
       if (temPlanos(filial)) dados.plano = { ...plano, atualizadoEm: new Date().toISOString() };
       setDB((d) => void (id = novoAluno(d, dados).id));
@@ -57,12 +59,17 @@ export default function PrimeiroAcesso() {
           <Field label="Data de nascimento"><input type="date" value={f.nascimento} onChange={(e) => setF({ ...f, nascimento: e.target.value })} /></Field>
           <Field label="RG"><input value={maskRG(f.rg || '')} onChange={(e) => setF({ ...f, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
           <Field label="CPF"><input value={maskCPF(f.cpf || '')} inputMode="numeric" onChange={(e) => setF({ ...f, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
-          <Field label="Academia / Filial">
-            <select value={f.filialId} onChange={(e) => setF({ ...f, filialId: e.target.value })}>
+          <Field label="Academia / Filial principal">
+            <select value={f.filialId} onChange={(e) => setF({ ...f, filialId: e.target.value, filiaisExtras: (f.filiaisExtras || []).filter((x) => x !== e.target.value) })}>
               <option value="">Selecione…</option>
               {db.filiais.filter((x) => x.ativa).map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </select>
           </Field>
+          {f.filialId && (
+            <Field label="Também treino em (opcional)">
+              <FiliaisTreino principal={f.filialId} value={f.filiaisExtras || []} onChange={(v) => setF({ ...f, filiaisExtras: v })} />
+            </Field>
+          )}
           <Field label="Graduação atual" hint="Se você ainda não tem faixa, deixe “Neutra”. O professor confere na aprovação.">
             <select value={f.faixaIdx} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
               <FaixaOptions />

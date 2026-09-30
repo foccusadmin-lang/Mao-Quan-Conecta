@@ -120,6 +120,11 @@ export const useFilialAtiva = () => useSyncExternalStore((l) => (ouvintesFilial.
 /** Filial principal + adicionais do professor */
 export const filiaisDoProfessor = (p) => [...new Set([p?.filialId, ...(p?.filiaisExtras || [])].filter(Boolean))];
 
+/** Aluno que treina em mais de uma filial (dias alternados): principal + filiaisExtras. Mensalidade e cadastro ficam na principal. */
+export const filiaisDoAluno = (a) => [...new Set([a?.filialId, ...(a?.filiaisExtras || [])].filter(Boolean))];
+export const alunoNaFilial = (a, filialId) => !!filialId && filiaisDoAluno(a).includes(filialId);
+export const filialExtraDoAluno = (a, filialId) => !!filialId && a?.filialId !== filialId && alunoNaFilial(a, filialId);
+
 // ---------- Sincronização com o Supabase ----------
 let timer = null;
 let fila = Promise.resolve();
@@ -592,9 +597,13 @@ export function rotinaFinanceira() {
   const diaDe = (a) => String(a.diaVencimento >= 1 && a.diaVencimento <= 28 ? a.diaVencimento : diaPadrao).padStart(2, "0");
   let mudou = false;
   const draft = structuredClone(db0);
+  // Professor só gera cobranças dos alunos das filiais dele (ele também enxerga alunos de outras filiais que treinam na dele)
+  const prof = session?.role === 'professor' ? draft.professores.find((p) => p.id === session.id) : null;
+  const minhas = prof ? new Set(filiaisDoProfessor(prof)) : null;
 
   for (const a of draft.alunos) {
     if (a.status !== 'aprovado') continue;
+    if (minhas && !minhas.has(a.filialId) && a.email !== prof.email) continue;
     if (a.somenteAtleta && !a.plano) continue; // professor com ficha só de atleta: sem plano de treino, sem mensalidade
     const existe = draft.pagamentos.some((p) => p.pessoaId === a.id && p.tipo === 'mensalidade' && p.competencia === comp);
     if (!existe && a.isento) {

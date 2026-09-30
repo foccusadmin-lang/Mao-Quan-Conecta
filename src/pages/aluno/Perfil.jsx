@@ -3,12 +3,14 @@ import { useDB, setDB, setSession, filialNome, notify } from '../../lib/db';
 import { fmtDate, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast } from '../../components/ui';
 import { CamposDadosPessoais, alteracoesImportantes, validarDados, enderecoVazio } from '../../components/DadosPessoais';
+import FiliaisTreino, { limparExtras } from '../../components/FiliaisTreino';
 
 export default function Perfil({ user }) {
   const db = useDB();
   const [f, setF] = useState(() => ({
     nome: user.nome || '', foto: user.foto, telefone: user.telefone || '', nascimento: user.nascimento || '', rg: user.rg || '', cpf: user.cpf || '',
     endereco: { ...enderecoVazio(), ...(user.endereco || {}) }, responsavel: user.responsavel || '', saude: { ...user.saude },
+    filiaisExtras: user.filiaisExtras || [],
   }));
 
   const salvar = () => {
@@ -17,8 +19,15 @@ export default function Perfil({ user }) {
     const dados = { ...f, nome: f.nome.trim().replace(/\s+/g, ' ') };
     if ((f.foto || null) !== (user.foto || null)) dados.fotoDefinida = true; // não volta a ser a foto do Google
     const mudou = alteracoesImportantes(user, dados);
+    const extras = limparExtras(user.filialId, f.filiaisExtras);
+    const novasFiliais = extras.filter((x) => !(user.filiaisExtras || []).includes(x));
+    if (extras.join() !== (user.filiaisExtras || []).join()) mudou.push('filiais de treino');
     setDB((d) => {
-      Object.assign(d.alunos.find((a) => a.id === user.id), dados);
+      const x = d.alunos.find((a) => a.id === user.id);
+      Object.assign(x, dados);
+      if (extras.length) x.filiaisExtras = extras;
+      else delete x.filiaisExtras;
+      for (const fid of novasFiliais) notify(d, 'filial:' + fid, 'Aluno de outra filial treinando aqui', `${dados.nome} (${filialNome(d, user.filialId)}) também treina nesta filial e já aparece na sua chamada.`);
       if (mudou.length) {
         const msg = `${dados.nome} atualizou: ${mudou.join(', ')}.`;
         notify(d, 'admin', 'Aluno atualizou o cadastro', msg);
@@ -41,6 +50,10 @@ export default function Perfil({ user }) {
             <Field label="Responsável (se menor de idade)" style={{ gridColumn: '1/-1' }}><Inp obj={f} set={setF} k="responsavel" /></Field>
           </div>
           {user.termos?.data && <div className="xs muted mt">Termos assinados em {fmtDate(user.termos.data)} como “{user.termos.assinatura}”.</div>}
+        </Card>
+        <Card title="🏯 Filiais onde treino">
+          <div className="small mb">Filial principal: <b>{filialNome(db, user.filialId)}</b></div>
+          <FiliaisTreino principal={user.filialId} value={f.filiaisExtras} onChange={(v) => setF({ ...f, filiaisExtras: v })} />
         </Card>
         <Card title="⚕️ Ficha de saúde">
           <div className="form-grid">
