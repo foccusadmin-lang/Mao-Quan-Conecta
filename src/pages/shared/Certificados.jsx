@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useDB, situacaoAluno, filialNome, professorVeAluno } from '../../lib/db';
+import { useDB, setDB, situacaoAluno, filialNome, professorVeAluno } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { fmtDate } from '../../lib/utils';
-import { PageHead, Card, Avatar, Faixa, Empty, Search, Modal } from '../../components/ui';
+import { PageHead, Card, Avatar, Faixa, Empty, Search, Modal, Field, toast } from '../../components/ui';
 import { certificadosDoAluno, CertificadoComAcoes } from '../../components/Certificado';
 
 /** O aluno não lê o cadastro de professores: busca só nome/título para a assinatura */
@@ -16,7 +16,19 @@ function useDbComAssinaturas(filialId) {
   return useMemo(() => (extra.length ? { ...db, professores: [...db.professores, ...extra.filter((p) => !db.professores.some((x) => x.id === p.id))] } : db), [db, extra]);
 }
 
-function ListaCertificados({ db, aluno, liberado = true, motivo }) {
+/** Professores que podem assinar pela filial do aluno (principal, responsáveis e vinculados) */
+function useProfessoresDaFilial(filialId, ativo) {
+  const [lista, setLista] = useState([]);
+  useEffect(() => {
+    if (!ativo || !filialId) return;
+    supabase.rpc('mq_assinaturas_professores', { p_filial: filialId }).then(({ data }) => setLista(Array.isArray(data) ? data : []));
+  }, [filialId, ativo]);
+  return lista;
+}
+
+function ListaCertificados({ db: db0, aluno, liberado = true, motivo, podeAjustar = false, user }) {
+  const profsFilial = useProfessoresDaFilial(aluno.filialId, podeAjustar);
+  const db = useMemo(() => (profsFilial.length ? { ...db0, professores: [...db0.professores, ...profsFilial.filter((p) => !db0.professores.some((x) => x.id === p.id))] } : db0), [db0, profsFilial]);
   const lista = certificadosDoAluno(db, aluno);
   const [sel, setSel] = useState(null);
   const atual = lista.find((c) => c.id === sel) || lista.at(-1);
@@ -31,7 +43,59 @@ function ListaCertificados({ db, aluno, liberado = true, motivo }) {
           </button>
         ))}
       </div>
-      <CertificadoComAcoes key={atual.id} c={atual} liberado={liberado} motivo={motivo} />
+      {podeAjustar && <AjusteCertificado key={atual.id} aluno={aluno} c={atual} professores={profsFilial} user={user} />}
+      <CertificadoComAcoes key={atual.id + (atual.ajustado ? 'a' : '')} c={atual} liberado={liberado} motivo={motivo} />
+    </div>
+  );
+}
+
+/** Professor/Central: data, local e professor que assina este certificado */
+function AjusteCertificado({ aluno, c, professores, user }) {
+  const [aberto, setAberto] = useState(false);
+  const [data, setData] = useState((c.data || '').slice(0, 10));
+  const [cidade, setCidade] = useState(c.cidade || '');
+  const [professorId, setProfessorId] = useState(c.professorId || '');
+  const opcoes = professores.some((p) => p.id === c.professorId) || !c.professorId ? professores : [{ id: c.professorId, nome: c.professor?.nome, titulo: c.professor?.titulo }, ...professores];
+
+  const salvar = (limpar = false) => {
+    setDB((d) => {
+      const x = d.alunos.find((a) => a.id === aluno.id);
+      if (!x) return;
+      const todos = { ...(x.certificados || {}) };
+      if (limpar) delete todos[c.faixaIdx];
+      else todos[c.faixaIdx] = { data, cidade: cidade.trim(), professorId: professorId || null, por: user.nome, em: new Date().toISOString() };
+      x.certificados = todos;
+      if (!Object.keys(todos).length) delete x.certificados;
+    });
+    toast(limpar ? 'Certificado voltou ao preenchimento automático.' : 'Certificado ajustado.');
+    setAberto(false);
+  };
+
+  if (!aberto)
+    return (
+      <div className="row between" style={{ flexWrap: 'wrap' }}>
+        <span className="xs muted">{c.ajustado ? '✏️ Este certificado tem ajustes manuais (data, local ou professor).' : 'Data, local e professor preenchidos automaticamente.'}</span>
+        <button type="button" className="btn sm ghost" onClick={() => setAberto(true)}>✏️ Ajustar certificado</button>
+      </div>
+    );
+  return (
+    <div className="card" style={{ background: '#faf8f6', padding: 12 }}>
+      <b className="small">✏️ Ajustar certificado — {c.ordem}ª graduação · {c.faixa}</b>
+      <div className="form-grid" style={{ marginTop: 8 }}>
+        <Field label="Data"><input type="date" value={data} onChange={(e) => setData(e.target.value)} /></Field>
+        <Field label="Local (cidade)"><input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Barueri" /></Field>
+        <Field label="Professor que assina" style={{ gridColumn: '1/-1' }} hint="Professores da filial do aluno">
+          <select value={professorId} onChange={(e) => setProfessorId(e.target.value)}>
+            <option value="">(automático: quem aprovou ou o responsável da filial)</option>
+            {opcoes.map((p) => <option key={p.id} value={p.id}>{p.titulo ? `${p.titulo} ` : ''}{p.nome}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div className="row mt">
+        <button type="button" className="btn" onClick={() => salvar(false)}>Salvar ajuste</button>
+        {c.ajustado && <button type="button" className="btn ghost" onClick={() => salvar(true)}>Voltar ao automático</button>}
+        <button type="button" className="btn ghost" onClick={() => setAberto(false)}>Cancelar</button>
+      </div>
     </div>
   );
 }
@@ -91,7 +155,7 @@ export default function Certificados({ user }) {
         ))}
       </Card>
       <Modal open={!!aluno} onClose={() => setAberto(null)} title={`📜 Certificados — ${aluno?.nome || ''}`} wide>
-        {aluno && <ListaCertificados db={db} aluno={aluno} />}
+        {aluno && <ListaCertificados db={db} aluno={aluno} podeAjustar user={user} />}
       </Modal>
     </>
   );

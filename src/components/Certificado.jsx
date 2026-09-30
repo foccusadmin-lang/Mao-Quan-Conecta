@@ -33,16 +33,20 @@ export function certificadosDoAluno(db, aluno) {
     .map((idx) => {
       const h = [...hist].reverse().find((x) => x.faixaIdx === idx);
       const f = faixas[idx] || {};
+      const aj = aluno.certificados?.[idx] || {}; // ajustes feitos pelo professor/Central
       const aprovador = h?.por && db.professores.find((p) => p.nome?.trim().toLowerCase() === h.por.trim().toLowerCase());
-      const prof = aprovador || profDaFilial;
+      const escolhido = aj.professorId && db.professores.find((p) => p.id === aj.professorId);
+      const prof = escolhido || aprovador || profDaFilial;
       return {
         id: `${aluno.id}-${idx}`,
         faixaIdx: idx,
         ordem: idx - 1,
         faixa: f.nome || '—',
         fase: f.nivel || '',
-        data: h?.data || aluno.aprovadoEm || aluno.criadoEm || new Date().toISOString(),
-        cidade: cidadeDe(filial),
+        data: aj.data || h?.data || aluno.aprovadoEm || aluno.criadoEm || new Date().toISOString(),
+        cidade: aj.cidade || cidadeDe(filial),
+        ajustado: !!(aj.data || aj.cidade || aj.professorId),
+        professorId: prof?.id || null,
         aluno: aluno.nome,
         documento: aluno.cpf ? { tipo: 'CPF', numero: maskCPF(aluno.cpf) } : aluno.rg ? { tipo: 'RG', numero: maskRG(aluno.rg) } : null,
         professor: prof ? { nome: prof.nome?.trim(), titulo: prof.titulo || 'Laoshi' } : h?.por ? { nome: h.por, titulo: '' } : null,
