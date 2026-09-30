@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useDB, setDB, notify } from '../../lib/db';
 import { fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, toast, Empty } from '../../components/ui';
+import { DocumentosAtleta } from '../../components/DocumentosAtleta';
 
 export default function Atleta({ user, base = "/aluno" }) {
   const db = useDB();
@@ -57,6 +58,9 @@ export default function Atleta({ user, base = "/aluno" }) {
           <div className="alert ink">🗂️ Espaço estruturado para fichas e treinos específicos do atleta. Será ativado após o teste piloto.</div>
         </Card>
       </div>
+
+      <h3 className="mt" style={{ marginBottom: 8 }}>📁 Documentos para competições</h3>
+      <DocumentosAtleta aluno={user} user={user} />
     </>
   );
 }

@@ -46,6 +46,7 @@ import Atleta from './pages/aluno/Atleta';
 import Pagamentos from './pages/aluno/Pagamentos';
 import MeuPlano from './pages/aluno/MeuPlano';
 import Certificados from './pages/shared/Certificados';
+import DocumentosAtletas from './pages/shared/DocumentosAtletas';
 import Perfil from './pages/aluno/Perfil';
 import { Institucional, DiretoriaList } from './components/shared';
 import { PageHead } from './components/ui';
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="filiais" element={<Filiais />} />
             <Route path="professores" element={<Professores />} />
             <Route path="certificados" element={<Certificados user={user} />} />
+            <Route path="documentos" element={<DocumentosAtletas user={user} />} />
             <Route path="alunos" element={<Alunos user={user} />} />
             <Route path="graduacao" element={<Graduacao user={user} />} />
             <Route path="financeiro" element={<Financeiro user={user} />} />
@@ -138,6 +140,7 @@ export default function App() {
             <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
             {temRecurso(user, 'carteira') && <Route path="carteira" element={<ProfCarteira user={user} />} />}
             <Route path="certificados" element={<Certificados user={user} />} />
+            <Route path="documentos" element={<DocumentosAtletas user={user} />} />
             {temRecurso(user, 'filiacao') && <Route path="filiacao" element={<Filiacao user={user} />} />}
             <Route path="plano" element={<ProfMeuPlano user={user} />} />
             <Route path="dados" element={<ProfMeusDados user={user} />} />
