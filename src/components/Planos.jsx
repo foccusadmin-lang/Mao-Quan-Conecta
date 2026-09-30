@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDB, setDB, flush, departamentos, notify, mensalidadeDoAluno } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { brl, monthISO } from '../lib/utils';
-import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor } from '../lib/planos';
+import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada } from '../lib/planos';
 import { Card, Field, toast } from './ui';
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,7 @@ export function PlanosFilialEditor({ filial }) {
     for (const nome of departamentos(db)) p.modalidades[nome] ||= { ativa: false, valor: '' };
     p.pacote ||= { ativo: false, valor: '' };
     p.familia ||= {};
+    p.combinada ||= { ativa: false, base: 'Tradicional', adicional: '' };
     return p;
   };
   const [p, setP] = useState(inicial);
@@ -29,10 +30,13 @@ export function PlanosFilialEditor({ filial }) {
   const salvar = () => {
     if (Object.values(p.modalidades).some((m) => m.ativa && !(+m.valor > 0))) return toast('Informe o valor de cada modalidade oferecida.');
     if (p.pacote.ativo && !(+p.pacote.valor > 0)) return toast('Informe o valor promocional do pacote.');
+    if (p.combinada.ativa && !p.modalidades[p.combinada.base]?.ativa) return toast('A modalidade-base da condição especial precisa estar oferecida.');
+    if (p.combinada.ativa && !(+p.combinada.adicional >= 0 && p.combinada.adicional !== '')) return toast('Informe o valor adicional por modalidade.');
     const limpo = {
       modalidades: Object.fromEntries(Object.entries(p.modalidades).filter(([, m]) => m.ativa || +m.valor > 0).map(([k, m]) => [k, { ativa: !!m.ativa, valor: +m.valor || 0 }])),
       pacote: { ativo: !!p.pacote.ativo, valor: +p.pacote.valor || 0 },
       familia: Object.fromEntries(COMBOS.filter((n) => +p.familia[n] > 0).map((n) => [n, +p.familia[n]])),
+      ...(p.combinada.ativa ? { combinada: { ativa: true, base: p.combinada.base, adicional: +p.combinada.adicional } } : {}),
     };
     setDB((d) => {
       const f = d.filiais.find((x) => x.id === filial.id);
@@ -56,6 +60,32 @@ export function PlanosFilialEditor({ filial }) {
             </div>
           </div>
         ))}
+      </Card>
+
+      <Card title="⭐ Condição especial (modalidade-base + adicional)">
+        <label className="check">
+          <input type="checkbox" checked={!!p.combinada.ativa} onChange={(e) => setP({ ...p, combinada: { ...p.combinada, ativa: e.target.checked } })} />
+          <div>Quem escolhe a modalidade-base paga o valor dela + um adicional fixo por cada outra modalidade<div className="xs muted">Ex.: Tradicional R$ 150 + R$ 50 por modalidade → Tradicional e Esportivo = R$ 200</div></div>
+        </label>
+        {p.combinada.ativa && (
+          <>
+            <div className="form-grid mt">
+              <Field label="Modalidade-base">
+                <select value={p.combinada.base} onChange={(e) => setP({ ...p, combinada: { ...p.combinada, base: e.target.value } })}>
+                  {Object.keys(p.modalidades).map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </Field>
+              <Field label="Adicional por modalidade (R$)">
+                <input type="number" min="0" step="0.01" value={p.combinada.adicional} onChange={(e) => setP({ ...p, combinada: { ...p.combinada, adicional: e.target.value } })} placeholder="50" />
+              </Field>
+            </div>
+            {+p.modalidades[p.combinada.base]?.valor > 0 && p.combinada.adicional !== '' && (
+              <p className="xs muted" style={{ marginBottom: 0 }}>
+                {[1, 2, 3, 4].filter((n) => n <= Math.max(1, ofertadas.length)).map((n) => `${n === 1 ? p.combinada.base : `${p.combinada.base} + ${n - 1}`}: ${brl(+p.modalidades[p.combinada.base].valor + (n - 1) * +p.combinada.adicional)}`).join(' · ')}
+              </p>
+            )}
+          </>
+        )}
       </Card>
 
       <div className="grid g2">
@@ -96,6 +126,7 @@ export function PlanosFilialEditor({ filial }) {
 // ---------------------------------------------------------------------------
 export function EscolhaPlano({ filial, value, onChange }) {
   const ofertadas = modalidadesOfertadas(filial);
+  const cc = condicaoCombinada(filial);
   const combos = combosAtivos(filial);
   const plano = value || { tipo: 'modalidades', modalidades: [] };
   const muda = (patch) => onChange({ ...plano, ...patch });
@@ -141,11 +172,14 @@ export function EscolhaPlano({ filial, value, onChange }) {
             const on = (plano.modalidades || []).includes(m.nome);
             return (
               <button key={m.nome} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => alterna(m.nome)}>
-                {on ? '✓ ' : ''}{m.nome}{plano.tipo === 'modalidades' ? ` · ${brl(m.valor)}` : ''}
+                {on ? '✓ ' : ''}{m.nome}{plano.tipo === 'modalidades' ? ` · ${cc && (plano.modalidades || []).includes(cc.base) && m.nome !== cc.base ? `+ ${brl(cc.adicional)}` : brl(m.valor)}` : ''}
               </button>
             );
           })}
         </div>
+      )}
+      {plano.tipo === 'modalidades' && cc && (
+        <div className="alert gold small">⭐ <div><b>Condição especial desta filial:</b> {cc.base} {brl(ofertadas.find((m) => m.nome === cc.base)?.valor || 0)} + <b>{brl(cc.adicional)}</b> por cada modalidade adicional.</div></div>
       )}
       {plano.tipo === 'pacote' && <div className="small">Inclui: <b>{ofertadas.map((m) => m.nome).join(', ')}</b></div>}
 

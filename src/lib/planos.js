@@ -21,13 +21,34 @@ export const combosAtivos = (f) => COMBOS.filter((n) => +f?.planos?.familia?.[n]
 /** Soma das modalidades escolhidas (sem desconto) */
 export const somaModalidades = (f, nomes = []) => modalidadesOfertadas(f).filter((m) => nomes.includes(m.nome)).reduce((s, m) => s + m.valor, 0);
 
+/**
+ * Condição especial da filial (ex.: Sede): quem escolhe a modalidade-base (Tradicional)
+ * paga o valor dela + um adicional fixo por cada outra modalidade escolhida.
+ * filial.planos.combinada = { ativa, base: 'Tradicional', adicional: 50 }
+ */
+export const condicaoCombinada = (f) => {
+  const c = f?.planos?.combinada;
+  return c?.ativa && c.base && +c.adicional >= 0 && modalidadesOfertadas(f).some((m) => m.nome === c.base) ? { base: c.base, adicional: +c.adicional } : null;
+};
+
+/** Valor das modalidades escolhidas, aplicando a condição especial quando houver */
+export function valorModalidades(f, nomes = []) {
+  const ofertadas = modalidadesOfertadas(f).filter((m) => nomes.includes(m.nome));
+  const cc = condicaoCombinada(f);
+  if (cc && ofertadas.some((m) => m.nome === cc.base)) {
+    const vBase = ofertadas.find((m) => m.nome === cc.base).valor;
+    return vBase + cc.adicional * (ofertadas.length - 1);
+  }
+  return ofertadas.reduce((s, m) => s + m.valor, 0);
+}
+
 /** Valor mensal do plano do aluno. Sem planos configurados na filial, vale a mensalidade base. */
 export function valorPlano(f, plano) {
   const base = +f?.mensalidade || 0;
   if (!temPlanos(f) || !plano) return base;
   if (plano.tipo === 'familia') return +f.planos.familia?.[plano.combo] || base;
   if (plano.tipo === 'pacote' && pacoteAtivo(f)) return +f.planos.pacote.valor;
-  return somaModalidades(f, plano.modalidades) || base;
+  return valorModalidades(f, plano.modalidades) || base;
 }
 
 export const modalidadesDoPlano = (f, plano) =>
@@ -58,5 +79,5 @@ export function validarPlano(f, plano) {
   return '';
 }
 
-export const economiaPacote = (f) => Math.max(0, somaModalidades(f, modalidadesOfertadas(f).map((m) => m.nome)) - (+f?.planos?.pacote?.valor || 0));
+export const economiaPacote = (f) => Math.max(0, valorModalidades(f, modalidadesOfertadas(f).map((m) => m.nome)) - (+f?.planos?.pacote?.valor || 0));
 export const rotuloValor = (v) => (v > 0 ? `${brl(v)}/mês` : '—');
