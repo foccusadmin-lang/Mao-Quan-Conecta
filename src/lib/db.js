@@ -8,7 +8,8 @@ import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026, GRAD_MODALID
 import { valorPlano, resumoPlano, temPlanos, modalidadesDoPlano } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
-const COLECOES = ['filiais', 'professores', 'alunos', 'pagamentos', 'presencas', 'materiais', 'eventos', 'comunicados', 'notificacoes'];
+// professores antes de filiais: ao tirar um professor de uma filial adicional, o cadastro dele é gravado primeiro
+const COLECOES = ['professores', 'filiais', 'alunos', 'pagamentos', 'presencas', 'materiais', 'eventos', 'comunicados', 'notificacoes'];
 const UNICOS = ['config', 'termos', 'institucional', 'modelos', 'diretoria', 'precos'];
 
 const listeners = new Set();

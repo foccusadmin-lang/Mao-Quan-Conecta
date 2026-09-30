@@ -36,8 +36,9 @@ if (import.meta.env.PROD) {
     return !digitando && !modalAberto && !enviando;
   };
 
-  const aplicar = async () => {
-    if (!pendente || atualizando || document.visibilityState !== 'hidden' || !seguro()) return;
+  // Momentos seguros: app em segundo plano OU logo ao trocar de tela (a nova tela já abre na versão nova, sem "Conectando…")
+  const aplicar = async (aoTrocarDeTela = false) => {
+    if (!pendente || atualizando || (!aoTrocarDeTela && document.visibilityState !== 'hidden') || !seguro()) return;
     atualizando = true;
     try {
       await Promise.race([flush(), new Promise((r) => setTimeout(r, 3000))]);
@@ -61,4 +62,5 @@ if (import.meta.env.PROD) {
   setInterval(verificar, 2 * 60 * 1000);
   window.addEventListener('focus', verificar);
   document.addEventListener('visibilitychange', () => (document.visibilityState === 'hidden' ? aplicar() : verificar()));
+  window.addEventListener('hashchange', () => pendente && setTimeout(() => aplicar(true), 150));
 }
