@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useDB, situacaoAluno, frequencia, professorEmDia, responsaveisFilial } from '../../lib/db';
+import { useDB, situacaoAluno, frequencia, professorEmDia, responsaveisFilial, professorVeAluno, modalidadesProfessor } from '../../lib/db';
 import { brl, fmtDate, todayISO, monthISO } from '../../lib/utils';
 import { PageHead, Stat, Card, Empty, Faixa, Avatar } from '../../components/ui';
 import { SponsorShare, InvestButton } from '../../components/shared';
@@ -18,13 +18,15 @@ export default function ProfDashboard({ user }) {
       </>
     );
 
-  const meusDeps = responsaveisFilial(filial).find((r) => r.professorId === user.id)?.departamentos || [];
-  const alunos = db.alunos.filter((a) => a.filialId === filial.id && a.status === 'aprovado');
-  const pendentes = db.alunos.filter((a) => a.filialId === filial.id && a.status === 'pendente');
+  const meusDeps = modalidadesProfessor(db, user);
+  const meus = (a) => a.filialId === filial.id && professorVeAluno(db, user, a); // só as modalidades do professor
+  const visivel = (pessoaId) => professorVeAluno(db, user, db.alunos.find((a) => a.id === pessoaId));
+  const alunos = db.alunos.filter((a) => meus(a) && a.status === 'aprovado');
+  const pendentes = db.alunos.filter((a) => meus(a) && a.status === 'pendente');
   const bloqueados = alunos.filter((a) => situacaoAluno(db, a).bloqueado);
-  const presHoje = db.presencas.filter((p) => p.filialId === filial.id && p.data === hoje);
-  const recebido = db.pagamentos.filter((p) => p.filialId === filial.id && p.status === 'pago' && p.pagoEm?.startsWith(monthISO())).reduce((s, p) => s + +p.valor, 0);
-  const aberto = db.pagamentos.filter((p) => p.filialId === filial.id && p.status === 'pendente').reduce((s, p) => s + +p.valor, 0);
+  const presHoje = db.presencas.filter((p) => p.filialId === filial.id && p.data === hoje && visivel(p.alunoId));
+  const recebido = db.pagamentos.filter((p) => p.filialId === filial.id && visivel(p.pessoaId) && p.status === 'pago' && p.pagoEm?.startsWith(monthISO())).reduce((s, p) => s + +p.valor, 0);
+  const aberto = db.pagamentos.filter((p) => p.filialId === filial.id && visivel(p.pessoaId) && p.status === 'pendente').reduce((s, p) => s + +p.valor, 0);
   const baixaFreq = alunos.filter((a) => !frequencia(db, a).ok);
   const comunicados = [...db.comunicados].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 3);
 

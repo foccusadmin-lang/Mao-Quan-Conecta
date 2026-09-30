@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
+import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -31,7 +31,7 @@ export default function Alunos({ user }) {
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial. Fale com o Administrador Geral.</Empty>;
 
-  const base = db.alunos.filter((a) => !filial || a.filialId === filial);
+  const base = db.alunos.filter((a) => (!filial || a.filialId === filial) && professorVeAluno(db, user, a));
   const lista = base
     .filter((a) => filtro === 'todos' || a.status === filtro || (filtro === 'atletas' && a.atleta?.ativo))
     .filter((a) => (a.nome + a.email + (a.matricula || '')).toLowerCase().includes(q.toLowerCase()))

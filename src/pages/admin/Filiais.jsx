@@ -33,7 +33,10 @@ export default function Filiais() {
           if (f.professorId === professorId) f.professorId = f.equipe[0]?.professorId || null;
         });
         const p = d.professores.find((x) => x.id === professorId);
-        if (p) p.filialId = fid;
+        if (p) {
+          p.filialId = fid;
+          p.modalidades = [...(equipe.find((r) => r.professorId === professorId)?.departamentos || [])]; // mesma informação no cadastro do professor
+        }
       });
       if (principal && edit._fotoProf !== undefined) {
         const p = d.professores.find((x) => x.id === principal);

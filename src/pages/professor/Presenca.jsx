@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB, frequencia, notify } from '../../lib/db';
+import { useDB, setDB, frequencia, notify, professorVeAluno } from '../../lib/db';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -13,8 +13,9 @@ export default function Presenca({ user }) {
   const [sel, setSel] = useState(null);
   const [trava, setTrava] = useState(null);
 
-  const alunos = filial ? db.alunos.filter((a) => a.filialId === filial.id && a.status === 'aprovado').sort((a, b) => a.nome.localeCompare(b.nome)) : [];
-  const doDia = db.presencas.filter((p) => p.filialId === filial?.id && p.data === data);
+  const alunos = filial ? db.alunos.filter((a) => a.filialId === filial.id && a.status === 'aprovado' && professorVeAluno(db, user, a)).sort((a, b) => a.nome.localeCompare(b.nome)) : [];
+  const meusIds = new Set(alunos.map((a) => a.id)); // só os alunos das modalidades deste professor
+  const doDia = db.presencas.filter((p) => p.filialId === filial?.id && p.data === data && meusIds.has(p.alunoId));
 
   // Sincroniza: pré-marca quem já confirmou pelo app ou chamada anterior
   const chave = doDia.map((p) => p.alunoId + p.confirmada).join();
@@ -31,7 +32,8 @@ export default function Presenca({ user }) {
 
   const salvar = () => {
     setDB((d) => {
-      d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && !marcados[p.alunoId]));
+      // Mexe só na chamada dos próprios alunos (não apaga a de outro professor da mesma filial)
+      d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && meusIds.has(p.alunoId) && !marcados[p.alunoId]));
       for (const a of alunos) {
         if (!marcados[a.id]) continue;
         const ex = d.presencas.find((p) => p.alunoId === a.id && p.data === data);

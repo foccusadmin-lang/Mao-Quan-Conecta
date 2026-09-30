@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { IDX_PRIMEIRA_PRETA } from '../../lib/seed';
-import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso, adicionarResponsavel, removerResponsavel, ehResponsavel } from '../../lib/db';
+import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recursosPadrao, temRecurso, adicionarResponsavel, removerResponsavel, ehResponsavel, departamentos, modalidadesProfessor, responsaveisFilial } from '../../lib/db';
 import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { CamposChavePix, prepararPix, pixVazio } from '../../components/ChavePix';
@@ -48,6 +48,8 @@ export default function Professores() {
       if (data.filialId) {
         const f = d.filiais.find((x) => x.id === data.filialId);
         if (f && !f.professorId) adicionarResponsavel(f, id);
+        // Mantém as modalidades iguais na equipe de responsáveis da filial
+        if (f && ehResponsavel(f, id)) f.equipe = responsaveisFilial(f).map((r) => (r.professorId === id ? { ...r, departamentos: [...(data.modalidades || [])] } : r));
       }
     });
     setEdit(null);
@@ -106,7 +108,7 @@ export default function Professores() {
                     <td><span className={`badge ${p.ativo ? 'ok' : ''}`}>{p.ativo ? 'Ativo' : 'Bloqueado'}</span><div className="xs muted">{RECURSOS_PROF.filter(([k]) => temRecurso(p, k)).length}/{RECURSOS_PROF.length} recursos</div></td>
                     <td className="nowrap">
                       <button className="btn sm ghost" onClick={() => promover(p)} title="Propor/Aprovar graduação">🎖️</button>{' '}
-                      <button className="btn sm dark" onClick={() => setEdit({ ...vazio, ...p, filialId: p.filialId || '', recursos: { ...recursosPadrao(), ...p.recursos } })}>Editar</button>{' '}
+                      <button className="btn sm dark" onClick={() => setEdit({ ...vazio, ...p, modalidades: [...modalidadesProfessor(db, p)], filialId: p.filialId || '', recursos: { ...recursosPadrao(), ...p.recursos } })}>Editar</button>{' '}
                       <button className="btn sm ghost" onClick={() => ask(`Excluir ${p.nome}?`, () => setDB((d) => { d.professores = d.professores.filter((x) => x.id !== p.id); d.filiais.forEach((f) => removerResponsavel(f, p.id)); }), 'Excluir')}>🗑</button>
                     </td>
                   </tr>
@@ -143,6 +145,18 @@ export default function Professores() {
                   <option value="">— Nenhuma —</option>
                   {db.filiais.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
+              </Field>
+              <Field label="Modalidades sob responsabilidade" style={{ gridColumn: '1/-1' }} hint="O professor vê só os alunos dessas modalidades na filial. Sem nenhuma marcada, vê todos os alunos da filial.">
+                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                  {departamentos(db).map((m) => {
+                    const on = (edit.modalidades || []).includes(m);
+                    return (
+                      <button key={m} type="button" className={`btn sm ${on ? '' : 'ghost'}`} onClick={() => setEdit({ ...edit, modalidades: on ? edit.modalidades.filter((x) => x !== m) : [...(edit.modalidades || []), m] })}>
+                        {on ? '✓ ' : ''}{m}
+                      </button>
+                    );
+                  })}
+                </div>
               </Field>
               <Field label="Filiação válida até" hint="Atualizada automaticamente ao confirmar o pagamento">
                 <Inp obj={edit} set={setEdit} k="filiacaoValidaAte" type="date" />

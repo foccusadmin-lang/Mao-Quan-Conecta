@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026, GRAD_MODALIDADES_PADRAO } from './seed';
-import { valorPlano, resumoPlano, temPlanos } from './planos';
+import { valorPlano, resumoPlano, temPlanos, modalidadesDoPlano } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
 const COLECOES = ['filiais', 'professores', 'alunos', 'pagamentos', 'presencas', 'materiais', 'eventos', 'comunicados', 'notificacoes'];
@@ -481,6 +481,35 @@ export function removerResponsavel(f, professorId) {
 }
 
 export const ehResponsavel = (f, professorId) => responsaveisFilial(f).some((r) => r.professorId === professorId);
+
+// ---------- Modalidades: o que cada professor enxerga ----------
+/** Modalidades sob responsabilidade do professor (cadastro dele; senão, as marcadas na equipe da filial) */
+export function modalidadesProfessor(db, prof) {
+  if (prof?.modalidades?.length) return prof.modalidades;
+  const f = db.filiais.find((x) => x.id === prof?.filialId);
+  return responsaveisFilial(f).find((r) => r.professorId === prof?.id)?.departamentos || [];
+}
+
+/** Modalidades que o aluno pratica: as do plano escolhido + as que têm graduação (TCQ, Sanda…) */
+export function modalidadesAluno(db, a) {
+  const f = db.filiais.find((x) => x.id === a?.filialId);
+  const lista = new Set(a?.plano && temPlanos(f) ? modalidadesDoPlano(f, a.plano) : []);
+  for (const [m, nivel] of Object.entries(a?.gradModalidades || {})) if (nivel != null) lista.add(m);
+  return [...lista];
+}
+
+/**
+ * O professor só vê os alunos das modalidades pelas quais responde.
+ * Sem modalidade definida (professor ou aluno), vale a filial inteira — ninguém some por falta de cadastro.
+ */
+export function professorVeAluno(db, user, a) {
+  if (!a || user?.role !== 'professor') return true;
+  const pm = modalidadesProfessor(db, user);
+  if (!pm.length) return true;
+  const am = modalidadesAluno(db, a);
+  if (!am.length) return true;
+  return am.some((m) => pm.includes(m));
+}
 
 /** Situação financeira do aluno: inadimplente se tiver mensalidade vencida além da tolerância */
 export function situacaoAluno(db, aluno) {

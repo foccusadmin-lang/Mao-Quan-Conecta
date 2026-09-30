@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useDB, setDB, notify, situacaoAluno, frequencia, filialNome, taxaExameFaixa } from '../../lib/db';
+import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, filialNome, taxaExameFaixa } from '../../lib/db';
 import { uid, todayISO, addDays, fmtDate, brl } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty } from '../../components/ui';
 
@@ -11,7 +11,7 @@ export default function Graduacao({ user }) {
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial.</Empty>;
 
-  const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin || a.filialId === user.filialId)).sort((a, b) => a.nome.localeCompare(b.nome));
+  const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin || (a.filialId === user.filialId && professorVeAluno(db, user, a)))).sort((a, b) => a.nome.localeCompare(b.nome));
 
   const avaliar = (a, status) =>
     setDB((d) => {
