@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useDB, situacaoAluno, professorEmDia, filialNome } from '../../lib/db';
 import { brl, fmtDate, todayISO, monthISO } from '../../lib/utils';
 import { PageHead, Stat, Card, Empty, Avatar } from '../../components/ui';
+import { BotaoLinkInvestidor } from '../../components/LinkInvestidor';
 import { SponsorShare } from '../../components/shared';
 
 export default function AdminDashboard() {
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   return (
     <>
       <PageHead title="Central Mao" sub="Visão geral da Associação em tempo real">
+        <BotaoLinkInvestidor />
         <SponsorShare nome="Central Mao — Matriz" />
       </PageHead>
 

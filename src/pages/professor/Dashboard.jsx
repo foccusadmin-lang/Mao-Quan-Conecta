@@ -4,6 +4,7 @@ import { brl, fmtDate, todayISO, monthISO } from '../../lib/utils';
 import { PageHead, Stat, Card, Empty, Faixa, Avatar } from '../../components/ui';
 import { SponsorShare, InvestButton } from '../../components/shared';
 import { MinhaChavePix } from '../../components/ChavePix';
+import { BotaoLinkInvestidor } from '../../components/LinkInvestidor';
 
 export default function ProfDashboard({ user }) {
   const db = useDB();
@@ -33,6 +34,7 @@ export default function ProfDashboard({ user }) {
   return (
     <>
       <PageHead title={`Olá, ${user.titulo} ${user.nome.split(' ')[0]}`} sub={`Unidade: ${filial.nome}${meusDeps.length ? ` · Modalidades: ${meusDeps.includes("Geral") ? "Geral (todas as modalidades)" : meusDeps.join(", ")}` : ""} · Mensalidade ${brl(filial.mensalidade)}`}>
+        <BotaoLinkInvestidor />
         <SponsorShare nome={`${user.titulo} ${user.nome}`} />
       </PageHead>
 

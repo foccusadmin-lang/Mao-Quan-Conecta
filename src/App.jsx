@@ -27,6 +27,7 @@ import Materiais from './pages/shared/Materiais';
 import OndeTreinar from './pages/shared/OndeTreinar';
 import Carreira from './pages/aluno/Carreira';
 import VitrineAtleta from './pages/VitrineAtleta';
+import PainelInvestidor from './pages/PainelInvestidor';
 
 import ProfDashboard from './pages/professor/Dashboard';
 import Presenca from './pages/professor/Presenca';
@@ -85,7 +86,7 @@ export default function App() {
   }, []);
 
   // Páginas públicas (validação do QR e patrocinador) não dependem de login
-  const publica = /^\/(validar|patrocinador|atleta)\//.test(loc.pathname + '/');
+  const publica = /^\/(validar|patrocinador|atleta|painel-patrocinador)\//.test(loc.pathname + '/');
   if (!publica && auth.status === 'carregando') return <TelaStatus titulo="Conectando…" texto="Carregando seus dados com segurança." />;
   if (!publica && auth.status === 'novo') return <><PrimeiroAcesso /><Toaster /></>;
   if (!publica && auth.status === 'recusado')
@@ -101,6 +102,7 @@ export default function App() {
         <Route path="/validar/:payload" element={<Validar />} />
         <Route path="/patrocinador/:token?" element={<Patrocinador />} />
         <Route path="/atleta/:slug" element={<VitrineAtleta />} />
+        <Route path="/painel-patrocinador/:token" element={<PainelInvestidor />} />
 
         {user?.role === 'admin' && (
           <Route path="/admin" element={<Layout user={user} />}>

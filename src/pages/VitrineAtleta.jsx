@@ -1,20 +1,26 @@
 ﻿import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { buscarVitrinePublica, estatisticas } from '../lib/vitrine';
-import { waLink, copy, fmtDate } from '../lib/utils';
+import { waLink, copy, fmtDate, APP_URL } from '../lib/utils';
 import { toast, Empty } from '../components/ui';
 import { QuadroMedalhas, ListaConquistas, Galeria, PixDoacao } from '../components/Vitrine';
 
 /** Vitrine pública do atleta — aberta sem login pelo link personalizado #/atleta/<nome> */
-export default function VitrineAtleta() {
-  const { slug } = useParams();
-  const [estado, setEstado] = useState({ carregando: true });
+// Também usada dentro do Painel do Patrocinador (recebe a vitrine pronta e um botão de voltar)
+export default function VitrineAtleta({ vitrine: pronta, voltar }) {
+  const params = useParams();
+  const slug = pronta?.slug || params.slug;
+  const [estado, setEstado] = useState(pronta ? { carregando: false, vitrine: pronta } : { carregando: true });
 
   useEffect(() => {
+    if (pronta) {
+      setEstado({ carregando: false, vitrine: pronta });
+      return;
+    }
     buscarVitrinePublica(slug)
       .then((r) => setEstado({ carregando: false, vitrine: r }))
       .catch((e) => setEstado({ carregando: false, erro: e.message }));
-  }, [slug]);
+  }, [slug, pronta]);
 
   useEffect(() => {
     if (estado.vitrine) document.title = `${estado.vitrine.data.nome} — Atleta Mao Quan Kung Fu Wushu`;
@@ -34,11 +40,16 @@ export default function VitrineAtleta() {
   const v = estado.vitrine.data;
   const p = v.patrocinio || {};
   const s = estatisticas(v);
-  const url = window.location.href;
+  const url = pronta ? `${APP_URL}#/atleta/${slug}` : window.location.href;
   const temPatrocinio = p.pixChave || /^https:\/\//.test(p.linkIndicacao || '');
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100%' }}>
+      {voltar && (
+        <div style={{ position: 'sticky', top: 0, zIndex: 20, background: 'rgba(20,20,20,.92)', padding: '10px 16px', paddingTop: 'calc(10px + env(safe-area-inset-top))' }}>
+          <button className="btn sm gold" onClick={voltar}>← Voltar aos atletas</button>
+        </div>
+      )}
       <section className="vitrine-hero" style={v.capa ? { backgroundImage: `linear-gradient(rgba(20,20,20,.72), rgba(20,20,20,.9)), url(${v.capa})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
         <div className="inner">
           <div className="row" style={{ gap: 18, alignItems: 'center' }}>
