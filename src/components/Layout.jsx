@@ -14,6 +14,7 @@ export const NAVS = {
     ['graduacao', '🎖️', 'Graduação & Pré-Exame'],
     ['financeiro', '💳', 'Financeiro'],
     ['carteirinhas', '🪪', 'Carteirinhas'],
+    ['certificados', '🎓', 'Certificados'],
     ['eventos', '📅', 'Eventos & Reuniões'],
     ['comunicados', '📢', 'Comunicados'],
     ['materiais', '🎬', 'Material Didático'],
@@ -34,6 +35,7 @@ export const NAVS = {
     ['eventos', '📅', 'Eventos'],
     ['onde-treinar', '📍', 'Onde Treinar'],
     ['carteira', '🪪', 'Minha Carteirinha'],
+    ['certificados', '🎓', 'Certificados'],
     ['filiacao', '🏅', 'Filiação'],
     ['plano', '📋', 'Meu Plano'],
     ['atleta', '🏆', 'Atleta'],
@@ -42,6 +44,7 @@ export const NAVS = {
   aluno: [
     ['', '🏠', 'Início'],
     ['carteira', '🪪', 'Carteira Digital'],
+    ['certificados', '🎓', 'Meus Certificados'],
     ['conteudo', '🎬', 'Meu Conteúdo'],
     ['presenca', '✅', 'Presença'],
     ['eventos', '📅', 'Eventos'],

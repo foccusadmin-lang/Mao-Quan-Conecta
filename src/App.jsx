@@ -44,6 +44,7 @@ import AlunoPresenca from './pages/aluno/Presenca';
 import Atleta from './pages/aluno/Atleta';
 import Pagamentos from './pages/aluno/Pagamentos';
 import MeuPlano from './pages/aluno/MeuPlano';
+import Certificados from './pages/shared/Certificados';
 import Perfil from './pages/aluno/Perfil';
 import { Institucional, DiretoriaList } from './components/shared';
 import { PageHead } from './components/ui';
@@ -106,6 +107,7 @@ export default function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="filiais" element={<Filiais />} />
             <Route path="professores" element={<Professores />} />
+            <Route path="certificados" element={<Certificados user={user} />} />
             <Route path="alunos" element={<Alunos user={user} />} />
             <Route path="graduacao" element={<Graduacao user={user} />} />
             <Route path="financeiro" element={<Financeiro user={user} />} />
@@ -133,6 +135,7 @@ export default function App() {
             {temRecurso(user, 'eventos') && <Route path="eventos" element={<Eventos user={user} />} />}
             <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
             {temRecurso(user, 'carteira') && <Route path="carteira" element={<ProfCarteira user={user} />} />}
+            <Route path="certificados" element={<Certificados user={user} />} />
             {temRecurso(user, 'filiacao') && <Route path="filiacao" element={<Filiacao user={user} />} />}
             <Route path="plano" element={<ProfMeuPlano user={user} />} />
             <Route path="dados" element={<ProfMeusDados user={user} />} />
@@ -156,6 +159,7 @@ export default function App() {
               <Route path="diretoria" element={<><PageHead title="Diretoria 2025" sub="Diretores em atuação na vigência atual" /><DiretoriaList /></>} />
               <Route path="plano" element={<MeuPlano user={user} />} />
               <Route path="pagamentos" element={<Pagamentos user={user} />} />
+              <Route path="certificados" element={<Certificados user={user} />} />
               <Route path="perfil" element={<Perfil user={user} />} />
             </Route>
           </Route>
