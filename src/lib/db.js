@@ -125,6 +125,19 @@ export const filiaisDoAluno = (a) => [...new Set([a?.filialId, ...(a?.filiaisExt
 export const alunoNaFilial = (a, filialId) => !!filialId && filiaisDoAluno(a).includes(filialId);
 export const filialExtraDoAluno = (a, filialId) => !!filialId && a?.filialId !== filialId && alunoNaFilial(a, filialId);
 
+/** Horários (turnos) de treino. aluno.turnos / professor.turnos = ['manha', 'tarde', 'noite'] */
+export const TURNOS = [
+  ['manha', 'Manhã', '🌅'],
+  ['tarde', 'Tarde', '☀️'],
+  ['noite', 'Noite', '🌙'],
+];
+export const nomeTurno = (t) => TURNOS.find(([k]) => k === t)?.[1] || '';
+export const turnoAgora = (d = new Date()) => (d.getHours() < 12 ? 'manha' : d.getHours() < 18 ? 'tarde' : 'noite');
+/** Aluno sem horário definido aparece em todas as chamadas até escolher */
+export const alunoNoTurno = (a, turno) => !turno || !a?.turnos?.length || a.turnos.includes(turno);
+/** Presença vale para a chamada deste turno (registros antigos, sem turno, valem para qualquer um) */
+export const presencaNoTurno = (p, turno) => !turno || !p?.turno || p.turno === turno;
+
 // ---------- Sincronização com o Supabase ----------
 let timer = null;
 let fila = Promise.resolve();

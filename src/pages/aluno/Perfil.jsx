@@ -4,6 +4,7 @@ import { fmtDate, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast } from '../../components/ui';
 import { CamposDadosPessoais, alteracoesImportantes, validarDados, enderecoVazio } from '../../components/DadosPessoais';
 import FiliaisTreino, { limparExtras } from '../../components/FiliaisTreino';
+import { TurnosInput, textoTurnos } from '../../components/Turnos';
 
 export default function Perfil({ user }) {
   const db = useDB();
@@ -11,6 +12,7 @@ export default function Perfil({ user }) {
     nome: user.nome || '', foto: user.foto, telefone: user.telefone || '', nascimento: user.nascimento || '', rg: user.rg || '', cpf: user.cpf || '',
     endereco: { ...enderecoVazio(), ...(user.endereco || {}) }, responsavel: user.responsavel || '', saude: { ...user.saude },
     filiaisExtras: user.filiaisExtras || [],
+    turnos: user.turnos || [],
   }));
 
   const salvar = () => {
@@ -22,9 +24,12 @@ export default function Perfil({ user }) {
     const extras = limparExtras(user.filialId, f.filiaisExtras);
     const novasFiliais = extras.filter((x) => !(user.filiaisExtras || []).includes(x));
     if (extras.join() !== (user.filiaisExtras || []).join()) mudou.push('filiais de treino');
+    if ((f.turnos || []).join() !== (user.turnos || []).join()) mudou.push(`horário de treino (${textoTurnos(f.turnos)})`);
     setDB((d) => {
       const x = d.alunos.find((a) => a.id === user.id);
       Object.assign(x, dados);
+      if (f.turnos?.length) x.turnos = f.turnos;
+      else delete x.turnos;
       if (extras.length) x.filiaisExtras = extras;
       else delete x.filiaisExtras;
       for (const fid of novasFiliais) notify(d, 'filial:' + fid, 'Aluno de outra filial treinando aqui', `${dados.nome} (${filialNome(d, user.filialId)}) também treina nesta filial e já aparece na sua chamada.`);
@@ -50,6 +55,11 @@ export default function Perfil({ user }) {
             <Field label="Responsável (se menor de idade)" style={{ gridColumn: '1/-1' }}><Inp obj={f} set={setF} k="responsavel" /></Field>
           </div>
           {user.termos?.data && <div className="xs muted mt">Termos assinados em {fmtDate(user.termos.data)} como “{user.termos.assinatura}”.</div>}
+        </Card>
+        <Card title="⏰ Horário de treino">
+          <p className="small muted" style={{ marginTop: 0 }}>Marque em qual horário você treina (pode ser mais de um). Você aparece na chamada do professor somente nesses horários.</p>
+          <TurnosInput value={f.turnos} onChange={(v) => setF({ ...f, turnos: v })} />
+          {!f.turnos?.length && <div className="xs muted mt">Sem horário definido, seu nome aparece em todas as chamadas.</div>}
         </Card>
         <Card title="🏯 Filiais onde treino">
           <div className="small mb">Filial principal: <b>{filialNome(db, user.filialId)}</b></div>

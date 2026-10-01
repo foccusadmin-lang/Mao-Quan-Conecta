@@ -9,6 +9,7 @@ import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 import FiliaisTreino, { limparExtras } from '../../components/FiliaisTreino';
 import { FotosFicha } from '../../components/FotoCarteirinha';
+import { TurnosInput, TurnosBadge } from '../../components/Turnos';
 
 export default function Alunos({ user }) {
   const db = useDB();
@@ -112,6 +113,7 @@ export default function Alunos({ user }) {
                           <div>
                             <div style={{ fontWeight: 600 }}>{a.nome} {(a.praticanteProfessor || db.professores.some((p) => p.email === (a.email || "").toLowerCase())) && <span className="badge gold" title="Professor também matriculado como praticante">Professor</span>} {a.atleta?.ativo && <span title="Atleta">🏆</span>} {a.saude?.restricoes && <span title="Restrição médica">⚕️</span>}</div>
                             <div className="xs muted">{a.matricula} · {a.email}</div>
+                            {a.status === 'aprovado' && <TurnosBadge turnos={a.turnos} />}
                           </div>
                         </div>
                       </td>
@@ -273,6 +275,7 @@ function AlunoModal({ id, user, onClose, ask }) {
       if (!x.plano) delete x.plano;
       if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
       if (!x.fotoCarteirinha) delete x.fotoCarteirinha; // removida: volta a usar a foto do perfil
+      if (!x.turnos?.length) delete x.turnos;
       x.filiaisExtras = limparExtras(x.filialId, f.filiaisExtras);
       if (!x.filiaisExtras.length) delete x.filiaisExtras;
       if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
@@ -338,6 +341,9 @@ function AlunoModal({ id, user, onClose, ask }) {
                 </select>
               </Field>
             )}
+            <Field label="Horário de treino" hint="Define em qual chamada (manhã / tarde / noite) o aluno aparece. Vazio: aparece em todas." style={{ gridColumn: '1/-1' }}>
+              <TurnosInput value={f.turnos || []} onChange={(v) => setF({ ...f, turnos: v })} />
+            </Field>
             <Field label="Também treina em" style={{ gridColumn: '1/-1' }}>
               <FiliaisTreino principal={f.filialId} value={f.filiaisExtras || []} onChange={(v) => setF({ ...f, filiaisExtras: v })} />
             </Field>

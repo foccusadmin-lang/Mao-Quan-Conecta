@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { temPlanos, validarPlano } from '../lib/planos';
 import { EscolhaPlano } from '../components/Planos';
 import FiliaisTreino, { limparExtras } from '../components/FiliaisTreino';
+import { TurnosInput } from '../components/Turnos';
 
 /** Conta Google ainda não cadastrada: formulário de solicitação de filiação */
 export default function PrimeiroAcesso() {
@@ -26,6 +27,7 @@ export default function PrimeiroAcesso() {
       let id;
       const dados = { ...f, nome: f.nome.trim(), email: auth.email, foto: auth.foto || null, filiaisExtras: limparExtras(f.filialId, f.filiaisExtras) };
       if (!dados.filiaisExtras.length) delete dados.filiaisExtras;
+      if (!dados.turnos?.length) delete dados.turnos;
       if (f.faixaIdx > 0) dados.faixaInformada = true; // declarada pelo aluno — o professor confere na aprovação
       if (temPlanos(filial)) dados.plano = { ...plano, atualizadoEm: new Date().toISOString() };
       setDB((d) => void (id = novoAluno(d, dados).id));
@@ -70,6 +72,9 @@ export default function PrimeiroAcesso() {
               <FiliaisTreino principal={f.filialId} value={f.filiaisExtras || []} onChange={(v) => setF({ ...f, filiaisExtras: v })} />
             </Field>
           )}
+          <Field label="Horário de treino" hint="Pode marcar mais de um. Você aparece na chamada do professor desses horários.">
+            <TurnosInput value={f.turnos || []} onChange={(v) => setF({ ...f, turnos: v })} />
+          </Field>
           <Field label="Graduação atual" hint="Se você ainda não tem faixa, deixe “Neutra”. O professor confere na aprovação.">
             <select value={f.faixaIdx} onChange={(e) => setF({ ...f, faixaIdx: +e.target.value })}>
               <FaixaOptions />

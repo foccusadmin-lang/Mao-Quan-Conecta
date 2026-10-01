@@ -1,4 +1,4 @@
-import { useDB, setDB, frequencia, filiaisDoAluno, filialNome } from '../../lib/db';
+import { useDB, setDB, frequencia, filiaisDoAluno, filialNome, turnoAgora, nomeTurno, presencaNoTurno } from '../../lib/db';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, toast } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -8,7 +8,8 @@ export function MarcarPresenca({ user }) {
   const hoje = todayISO();
   const filiais = filiaisDoAluno(user);
   const varias = filiais.length > 1;
-  const regs = db.presencas.filter((p) => p.alunoId === user.id && p.data === hoje);
+  const turno = turnoAgora(); // a presença vai para a chamada deste horário (manhã / tarde / noite)
+  const regs = db.presencas.filter((p) => p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno));
   const confirmada = regs.find((p) => p.confirmada);
   const pendente = regs.find((p) => !p.confirmada);
   const reg = confirmada || pendente;
@@ -16,15 +17,15 @@ export function MarcarPresenca({ user }) {
   // Treina em mais de uma filial: marca na filial onde está hoje (e pode trocar enquanto o professor não confirmar)
   const marcar = (filialId) => {
     setDB((d) => {
-      d.presencas = d.presencas.filter((p) => !(p.alunoId === user.id && p.data === hoje && !p.confirmada));
-      d.presencas.push({ id: uid('pz'), alunoId: user.id, filialId, data: hoje, origem: 'aluno', confirmada: false });
+      d.presencas = d.presencas.filter((p) => !(p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno) && !p.confirmada));
+      d.presencas.push({ id: uid('pz'), alunoId: user.id, filialId, data: hoje, turno, origem: 'aluno', confirmada: false });
     });
     toast(`Presença registrada${varias ? ' em ' + filialNome(db, filialId) : ''}! Aguarde a confirmação do Laoshi.`);
   };
   const onde = (p) => (varias ? ` (${filialNome(db, p.filialId)})` : '');
 
   return (
-    <Card title="✅ Presença de hoje">
+    <Card title={`✅ Presença de hoje — ${nomeTurno(turno)}`}>
       {reg && (
         <div className={`alert ${reg.confirmada ? 'ok' : 'gold'}`}>
           {reg.confirmada ? `✔ Presença confirmada pelo professor${onde(reg)}.` : `⏳ Presença marcada${onde(reg)} — aguardando confirmação na chamada.`}
@@ -65,7 +66,7 @@ export default function AlunoPresenca({ user }) {
           {ultimas.length === 0 && <p className="muted">Sem registros.</p>}
           {ultimas.map((p) => (
             <div key={p.id} className="list-item">
-              <div className="grow">{fmtDate(p.data)}{filiaisDoAluno(user).length > 1 && <span className="xs muted"> · {filialNome(db, p.filialId)}</span>}</div>
+              <div className="grow">{fmtDate(p.data)}{p.turno && <span className="xs muted"> · {nomeTurno(p.turno)}</span>}{filiaisDoAluno(user).length > 1 && <span className="xs muted"> · {filialNome(db, p.filialId)}</span>}</div>
               <span className={`badge ${p.confirmada ? 'ok' : 'warn'}`}>{p.confirmada ? 'Confirmada' : 'Aguardando'}</span>
             </div>
           ))}

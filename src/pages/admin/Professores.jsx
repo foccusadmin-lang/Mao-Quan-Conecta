@@ -5,6 +5,7 @@ import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { CamposChavePix, prepararPix, pixVazio } from '../../components/ChavePix';
 import { FotosFicha } from '../../components/FotoCarteirinha';
+import { TurnosInput } from '../../components/Turnos';
 
 const TITULOS = ['Shifu', 'Laoshi', 'Jiǎngshī', 'Jiàoliàn', 'Zhùjiào'];
 const vazio = { nome: '', email: '', telefone: '', rg: '', cpf: '', nascimento: '', titulo: 'Laoshi', faixaIdx: IDX_PRIMEIRA_PRETA, filialId: '', foto: null, ativo: true, filiacaoValidaAte: '', obs: '', recursos: recursosPadrao() };
@@ -46,7 +47,8 @@ export default function Professores() {
         if ((data.foto || null) !== (alvo.foto || null)) data.fotoDefinida = true; // não volta a ser a foto do Google
         Object.assign(alvo, data);
         if (!pix) delete alvo.pix;
-        if (!alvo.fotoCarteirinha) delete alvo.fotoCarteirinha; // sem 3×4: carteirinha usa a foto do perfil
+        if (!alvo.fotoCarteirinha) delete alvo.fotoCarteirinha;
+        if (!alvo.turnos?.length) delete alvo.turnos; // sem 3×4: carteirinha usa a foto do perfil
         // Mesma pessoa como praticante: nome e fotos iguais nas duas fichas
         const pr = d.alunos.find((a) => (a.email || '').toLowerCase() === email);
         if (pr) {
@@ -152,6 +154,9 @@ export default function Professores() {
               <Field label="E-mail de login (Google)"><Inp obj={edit} set={setEdit} k="email" type="email" /></Field>
               <Field label="Telefone"><Inp obj={edit} set={setEdit} k="telefone" type="tel" mask={maskTelefone} placeholder="(11) 90000-0000" /></Field>
               <Field label="Nascimento"><Inp obj={edit} set={setEdit} k="nascimento" type="date" /></Field>
+              <Field label="Horários de aula" hint="A chamada abre já no horário do professor (ele pode trocar). Vazio: abre no horário do momento." style={{ gridColumn: '1/-1' }}>
+                <TurnosInput value={edit.turnos || []} onChange={(v) => setEdit({ ...edit, turnos: v })} />
+              </Field>
               <Field label="RG"><input value={maskRG(edit.rg || '')} onChange={(e) => setEdit({ ...edit, rg: maskRG(e.target.value) })} placeholder="00.000.000-0" inputMode="text" maxLength={12} /></Field>
               <Field label="CPF"><input value={maskCPF(edit.cpf || '')} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} placeholder="000.000.000-00" maxLength={14} /></Field>
               <Field label="Título">
