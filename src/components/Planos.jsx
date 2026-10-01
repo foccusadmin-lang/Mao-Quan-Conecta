@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDB, setDB, flush, departamentos, notify, mensalidadeDoAluno } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { brl, monthISO } from '../lib/utils';
-import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER, adicionalFamilia, extrasFamilia } from '../lib/planos';
+import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER, adicionalFamilia, extrasFamilia, resumoPlano, validarPlano } from '../lib/planos';
 import { Card, Field, toast } from './ui';
 
 // ---------------------------------------------------------------------------
@@ -406,6 +406,55 @@ export function ValorMensalidade({ aluno, user }) {
 // Financeiro: editar uma cobrança em aberto (valor/vencimento) e, se quiser,
 // salvar o valor como mensalidade personalizada do aluno para os próximos meses
 // ---------------------------------------------------------------------------
+/** Dentro de "Editar mensalidade": ver e corrigir o plano do aluno (quando ele teve dificuldade em escolher) */
+function PlanoNaCobranca({ aluno, onPlanoSalvo }) {
+  const db = useDB();
+  const filial = db.filiais.find((f) => f.id === aluno.filialId);
+  const [editando, setEditando] = useState(false);
+  const [plano, setPlano] = useState(aluno.plano || null);
+  const [salvando, setSalvando] = useState(false);
+  if (!temPlanos(filial)) return null;
+
+  const salvar = async () => {
+    const erro = validarPlano(filial, plano);
+    if (erro) return toast(erro);
+    setSalvando(true);
+    try {
+      await salvarPlanoAluno(aluno.id, plano);
+      const v = valorPlano(filial, plano);
+      setEditando(false);
+      onPlanoSalvo?.(v);
+      toast(`Plano salvo. Valor desta cobrança ajustado para ${brl(v)} — confira e clique em “Salvar alterações”.`);
+    } catch (e) {
+      toast('Não foi possível salvar o plano: ' + e.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ padding: 12, background: '#faf8f6' }}>
+      <div className="row between" style={{ alignItems: 'center' }}>
+        <div className="grow">
+          <div className="small" style={{ fontWeight: 700 }}>📋 Plano do aluno</div>
+          <div className="small">{aluno.plano ? <>{resumoPlano(filial, aluno.plano)} · <b>{brl(valorPlano(filial, aluno.plano))}/mês</b></> : <span className="muted">Nenhum plano escolhido — vale a mensalidade base ({brl(filial.mensalidade || 0)})</span>}</div>
+        </div>
+        {!editando && <button type="button" className="btn sm ghost" onClick={() => (setPlano(aluno.plano || null), setEditando(true))}>✏️ Editar plano</button>}
+      </div>
+      {editando && (
+        <div className="col mt">
+          <EscolhaPlano filial={filial} value={plano} onChange={setPlano} />
+          <div className="row" style={{ gap: 6 }}>
+            <button type="button" className="btn" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar plano'}</button>
+            <button type="button" className="btn ghost" onClick={() => setEditando(false)}>Cancelar</button>
+          </div>
+          <div className="xs muted">O plano vale para as próximas mensalidades. Depois de salvar, o valor desta cobrança é ajustado ao novo plano para você conferir.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function EditarCobranca({ pagamentoId, user, onFeito }) {
   const db = useDB();
   const p = db.pagamentos.find((x) => x.id === pagamentoId);
@@ -415,6 +464,7 @@ export function EditarCobranca({ pagamentoId, user, onFeito }) {
   const [vencimento, setVencimento] = useState(p?.vencimento || '');
   const [motivo, setMotivo] = useState(aluno?.mensalidadePersonalizada?.motivo || '');
   const [fixar, setFixar] = useState(p?.tipo === 'mensalidade' && !!aluno);
+  const [planoMudou, setPlanoMudou] = useState(false);
   if (!p) return null;
   if (p.status !== 'pendente') return <div className="alert ok small">Esta cobrança já foi paga e não pode ser editada.</div>;
 
@@ -432,6 +482,10 @@ export function EditarCobranca({ pagamentoId, user, onFeito }) {
       x.valor = novo;
       x.vencimento = vencimento;
       if (p.tipo === 'mensalidade') {
+        // Plano corrigido aqui mesmo: a descrição da cobrança acompanha o novo plano
+        const al = aluno && d.alunos.find((y) => y.id === aluno.id);
+        const fil = al && d.filiais.find((f) => f.id === al.filialId);
+        if (planoMudou && al?.plano && temPlanos(fil)) x.descricao = `Mensalidade ${x.competencia} — ${resumoPlano(fil, al.plano)}`;
         if (ehPadrao) (delete x.personalizada, delete x.valorPadrao);
         else Object.assign(x, { personalizada: true, valorPadrao: m?.padrao });
       }
@@ -455,6 +509,9 @@ export function EditarCobranca({ pagamentoId, user, onFeito }) {
         <div className="small">{p.descricao}</div>
         {m && <div className="xs muted">Mensalidade padrão da academia para este aluno: <b>{brl(m.padrao)}</b>{m.personalizada ? ` · hoje personalizada em ${brl(m.valor)} (${m.motivo || '—'})` : ''}</div>}
       </div>
+      {p.tipo === 'mensalidade' && aluno && !aluno.isentoPor && (
+        <PlanoNaCobranca aluno={aluno} onPlanoSalvo={(v) => (setValor(String(v)), setFixar(false), setPlanoMudou(true))} />
+      )}
       {p.analise === 'enviado' && <div className="alert gold small">Esta cobrança já tem comprovante em conferência. Confira o valor pago antes de alterar.</div>}
       <div className="form-grid">
         <Field label="Valor desta cobrança (R$)" hint={m && novo < m.padrao ? `Desconto de ${brl(m.padrao - novo)} sobre o padrão` : ''}>
