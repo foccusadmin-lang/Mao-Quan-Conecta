@@ -4,6 +4,7 @@ import { useDB, setDB, professorEmDia, filialNome, notify, RECURSOS_PROF, recurs
 import { uid, fmtDate, addDays, todayISO, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, useConfirm, toast, Empty, Search, FaixaOptions } from '../../components/ui';
 import { CamposChavePix, prepararPix, pixVazio } from '../../components/ChavePix';
+import { FotosFicha } from '../../components/FotoCarteirinha';
 
 const TITULOS = ['Shifu', 'Laoshi', 'Jiǎngshī', 'Jiàoliàn', 'Zhùjiào'];
 const vazio = { nome: '', email: '', telefone: '', rg: '', cpf: '', nascimento: '', titulo: 'Laoshi', faixaIdx: IDX_PRIMEIRA_PRETA, filialId: '', foto: null, ativo: true, filiacaoValidaAte: '', obs: '', recursos: recursosPadrao() };
@@ -45,11 +46,14 @@ export default function Professores() {
         if ((data.foto || null) !== (alvo.foto || null)) data.fotoDefinida = true; // não volta a ser a foto do Google
         Object.assign(alvo, data);
         if (!pix) delete alvo.pix;
-        // Mesma pessoa como praticante: nome e foto iguais nas duas fichas
+        if (!alvo.fotoCarteirinha) delete alvo.fotoCarteirinha; // sem 3×4: carteirinha usa a foto do perfil
+        // Mesma pessoa como praticante: nome e fotos iguais nas duas fichas
         const pr = d.alunos.find((a) => (a.email || '').toLowerCase() === email);
         if (pr) {
           pr.nome = data.nome;
           pr.foto = data.foto;
+          if (data.fotoCarteirinha) pr.fotoCarteirinha = data.fotoCarteirinha;
+          else delete pr.fotoCarteirinha;
           if (data.fotoDefinida) pr.fotoDefinida = true;
         }
       } else {
@@ -142,7 +146,7 @@ export default function Professores() {
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Editar professor' : 'Novo professor'} footer={<button className="btn" onClick={salvar}>Salvar</button>}>
         {edit && (
           <div className="col">
-            <PhotoInput value={edit.foto} name={edit.nome} onChange={(v) => setEdit({ ...edit, foto: v })} />
+            <FotosFicha f={edit} setF={setEdit} />
             <div className="form-grid">
               <Field label="Nome completo"><Inp obj={edit} set={setEdit} k="nome" /></Field>
               <Field label="E-mail de login (Google)"><Inp obj={edit} set={setEdit} k="email" type="email" /></Field>

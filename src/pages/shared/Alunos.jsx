@@ -8,6 +8,7 @@ import { EscolhaPlano, salvarPlanoAluno, DiaVencimento, ValorMensalidade } from 
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
 import { temPlanos, valorPlano, resumoPlano, validarPlano } from '../../lib/planos';
 import FiliaisTreino, { limparExtras } from '../../components/FiliaisTreino';
+import { FotosFicha } from '../../components/FotoCarteirinha';
 
 export default function Alunos({ user }) {
   const db = useDB();
@@ -271,6 +272,7 @@ function AlunoModal({ id, user, onClose, ask }) {
       Object.assign(x, { ...f, gradModalidades: x.gradModalidades, fotoDefinida: x.fotoDefinida, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
       if (!x.plano) delete x.plano;
       if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
+      if (!x.fotoCarteirinha) delete x.fotoCarteirinha; // removida: volta a usar a foto do perfil
       x.filiaisExtras = limparExtras(x.filialId, f.filiaisExtras);
       if (!x.filiaisExtras.length) delete x.filiaisExtras;
       if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
@@ -319,7 +321,7 @@ function AlunoModal({ id, user, onClose, ask }) {
 
       {tab === 'cadastro' && (
         <div className="col">
-          <PhotoInput value={f.foto} name={f.nome} onChange={(v) => setF({ ...f, foto: v })} />
+          <FotosFicha f={f} setF={setF} />
           <div className="form-grid">
             <Field label="Nome"><Inp obj={f} set={setF} k="nome" /></Field>
             <Field label="E-mail (Google)"><Inp obj={f} set={setF} k="email" type="email" disabled={!isAdmin} /></Field>

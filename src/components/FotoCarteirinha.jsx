@@ -1,6 +1,23 @@
 import { setDB } from '../lib/db';
 import { Card, PhotoInput, toast } from './ui';
 
+/** Fichas (Central / professor): foto do perfil + foto 3×4 da carteirinha lado a lado. Sem 3×4, a carteirinha usa a do perfil. */
+export function FotosFicha({ f, setF }) {
+  return (
+    <div className="row" style={{ gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div className="col" style={{ gap: 6 }}>
+        <div className="small" style={{ fontWeight: 600 }}>Foto do perfil</div>
+        <PhotoInput value={f.foto} name={f.nome} onChange={(v) => setF({ ...f, foto: v })} />
+      </div>
+      <div className="col" style={{ gap: 6 }}>
+        <div className="small" style={{ fontWeight: 600 }}>📷 Foto da carteirinha (3×4)</div>
+        <PhotoInput formato="3x4" value={f.fotoCarteirinha || null} name={f.nome} onChange={(v) => setF({ ...f, fotoCarteirinha: v })} />
+        <div className="xs muted">{f.fotoCarteirinha ? 'A carteirinha usa esta foto 3×4.' : 'Vazio: a carteirinha usa a foto do perfil.'}</div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Foto da carteirinha (3×4), separada da foto de perfil.
  * O perfil continua com a foto de identificação/atleta; a carteirinha pode usar uma foto de documento.
