@@ -1,4 +1,4 @@
-import { useDB, setDB, frequencia, filiaisDoAluno, filialNome, turnoAgora, nomeTurno, presencaNoTurno } from '../../lib/db';
+import { useDB, setDB, frequencia, filiaisDoAluno, filialNome, turnoAgora, nomeTurno, presencaNoTurno, horariosFilial, horarioAgora } from '../../lib/db';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, toast } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -15,10 +15,20 @@ export function MarcarPresenca({ user }) {
   const reg = confirmada || pendente;
 
   // Treina em mais de uma filial: marca na filial onde está hoje (e pode trocar enquanto o professor não confirmar)
+  // Grade de horários: vai para a aula dele de hoje neste período (ou a que está acontecendo agora)
+  const horarioDe = (filialId) => {
+    const fil = db.filiais.find((x) => x.id === filialId);
+    const hoje = horariosFilial(fil, turno, new Date().getDay());
+    const meus = hoje.filter((h) => user.horarios?.includes(h.id));
+    if (meus.length === 1) return meus[0].id;
+    const agora = horarioAgora(fil, turno);
+    return (meus.length ? meus : hoje).find((h) => h.id === agora?.id)?.id || meus[0]?.id || null;
+  };
   const marcar = (filialId) => {
+    const horario = horarioDe(filialId);
     setDB((d) => {
       d.presencas = d.presencas.filter((p) => !(p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno) && !p.confirmada));
-      d.presencas.push({ id: uid('pz'), alunoId: user.id, filialId, data: hoje, turno, origem: 'aluno', confirmada: false });
+      d.presencas.push({ id: uid('pz'), alunoId: user.id, filialId, data: hoje, turno, ...(horario ? { horario } : {}), origem: 'aluno', confirmada: false });
     });
     toast(`Presença registrada${varias ? ' em ' + filialNome(db, filialId) : ''}! Aguarde a confirmação do Laoshi.`);
   };

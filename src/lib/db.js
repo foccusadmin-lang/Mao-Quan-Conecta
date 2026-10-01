@@ -138,6 +138,37 @@ export const alunoNoTurno = (a, turno) => !turno || !a?.turnos?.length || a.turn
 /** Presença vale para a chamada deste turno (registros antigos, sem turno, valem para qualquer um) */
 export const presencaNoTurno = (p, turno) => !turno || !p?.turno || p.turno === turno;
 
+/**
+ * Grade da filial: vários horários no mesmo período.
+ * filial.horarios = [{ id, turno: 'noite', inicio: '18:00', fim: '19:30' }]; aluno.horarios = [ids] (implica o turno)
+ */
+export const turnoDoHorario = (inicio = '') => {
+  const h = +String(inicio).slice(0, 2);
+  return h < 12 ? 'manha' : h < 18 ? 'tarde' : 'noite';
+};
+/** Dias da semana (0 = domingo, como Date.getDay). horario.dias vazio = todos os dias */
+export const DIAS_SEMANA = [[1, 'Seg'], [2, 'Ter'], [3, 'Qua'], [4, 'Qui'], [5, 'Sex'], [6, 'Sáb'], [0, 'Dom']];
+export const diaDaData = (iso) => new Date(iso + 'T12:00').getDay();
+export const horarioNoDia = (h, dia) => dia === undefined || dia === null || !h.dias?.length || h.dias.includes(dia);
+export const textoDias = (h) => (!h?.dias?.length || h.dias.length === 7 ? 'Todos os dias' : DIAS_SEMANA.filter(([d]) => h.dias.includes(d)).map(([, n]) => n).join('/'));
+export const horariosFilial = (f, turno, dia) => (f?.horarios || []).filter((h) => (!turno || h.turno === turno) && horarioNoDia(h, dia)).sort((a, b) => a.inicio.localeCompare(b.inicio));
+export const rotuloHorario = (h, comDias) => (h ? `${comDias && h.dias?.length && h.dias.length < 7 ? textoDias(h) + ' ' : ''}${h.inicio}–${h.fim}` : '');
+/** Aluno está na chamada deste horário? Quem treina no período mas ainda não escolheu o horário aparece em todos os horários dele */
+export function alunoNoHorario(a, h, filial) {
+  if (!h) return true;
+  if (a?.horarios?.includes(h.id)) return true;
+  if (!alunoNoTurno(a, h.turno)) return false;
+  const doPeriodo = horariosFilial(filial, h.turno).map((x) => x.id);
+  return !(a?.horarios || []).some((id) => doPeriodo.includes(id));
+}
+export const presencaNoHorario = (p, h) => !h || p?.horario === h.id || (!p?.horario && presencaNoTurno(p, h.turno));
+/** Horário em andamento (ou o próximo do período) para abrir a chamada já nele */
+export function horarioAgora(f, turno, d = new Date()) {
+  const lista = horariosFilial(f, turno, d.getDay());
+  const agora = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return lista.find((h) => h.inicio <= agora && agora < h.fim) || lista.find((h) => agora < h.inicio) || lista.at(-1) || null;
+}
+
 // ---------- Sincronização com o Supabase ----------
 let timer = null;
 let fila = Promise.resolve();

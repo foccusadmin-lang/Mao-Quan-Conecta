@@ -3,12 +3,14 @@ import { useDB, setDB, responsaveisFilial, departamentos, filialNome } from '../
 import { brl, uid, waLink, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, useConfirm, toast, Empty } from '../../components/ui';
 import { LinkMapa, enderecoFilial } from '../../components/shared';
+import { HorariosFilialEditor } from '../../components/Turnos';
 
 const vazio = { nome: '', cidade: '', endereco: '', responsaveis: '', telefone: '', email: '', professorId: '', equipe: [], mensalidade: 120, aulasSemana: 2, minFrequencia: 75, maxFaltas: 6, ativa: true };
 
 export default function Filiais() {
   const db = useDB();
   const [edit, setEdit] = useState(null);
+  const [horariosDe, setHorariosDe] = useState(null); // filial com a grade de horários aberta
   const [ask, confirmEl] = useConfirm();
   const deps = departamentos(db);
 
@@ -104,16 +106,22 @@ export default function Filiais() {
               <div className="row small muted">
                 <span>🥋 {alunos} alunos</span>
                 <span>📆 {f.aulasSemana}x/semana</span>
+                <span>🕐 {(f.horarios || []).length ? `${f.horarios.length} horário(s) de aula` : 'sem grade de horários'}</span>
                 <span>✅ mín. {f.minFrequencia}%</span>
               </div>
               <div className="row end mt">
                 <button className="btn sm ghost" onClick={() => ask(`Excluir a filial “${f.nome}”? Os alunos vinculados ficarão sem filial.`, () => setDB((d) => { d.filiais = d.filiais.filter((x) => x.id !== f.id); }), 'Excluir')}>Excluir</button>
+                <button className="btn sm ghost" onClick={() => setHorariosDe(f.id)}>🕐 Horários</button>
                 <button className="btn sm dark" onClick={() => abrir(f)}>Editar</button>
               </div>
             </Card>
           );
         })}
       </div>
+
+      <Modal open={!!horariosDe} onClose={() => setHorariosDe(null)} title="Horários de aula" wide>
+        {horariosDe && db.filiais.find((x) => x.id === horariosDe) && <HorariosFilialEditor filial={db.filiais.find((x) => x.id === horariosDe)} />}
+      </Modal>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} title={edit?.id ? 'Editar filial' : 'Nova filial'} wide footer={<button className="btn" onClick={salvar}>Salvar</button>}>
         {edit && (

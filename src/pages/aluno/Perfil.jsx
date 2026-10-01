@@ -4,7 +4,8 @@ import { fmtDate, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast } from '../../components/ui';
 import { CamposDadosPessoais, alteracoesImportantes, validarDados, enderecoVazio } from '../../components/DadosPessoais';
 import FiliaisTreino, { limparExtras } from '../../components/FiliaisTreino';
-import { TurnosInput, textoTurnos } from '../../components/Turnos';
+import { HorarioTreinoInput, textoTurnos } from '../../components/Turnos';
+import { filiaisDoAluno } from '../../lib/db';
 
 export default function Perfil({ user }) {
   const db = useDB();
@@ -13,6 +14,7 @@ export default function Perfil({ user }) {
     endereco: { ...enderecoVazio(), ...(user.endereco || {}) }, responsavel: user.responsavel || '', saude: { ...user.saude },
     filiaisExtras: user.filiaisExtras || [],
     turnos: user.turnos || [],
+    horarios: user.horarios || [],
   }));
 
   const salvar = () => {
@@ -24,12 +26,14 @@ export default function Perfil({ user }) {
     const extras = limparExtras(user.filialId, f.filiaisExtras);
     const novasFiliais = extras.filter((x) => !(user.filiaisExtras || []).includes(x));
     if (extras.join() !== (user.filiaisExtras || []).join()) mudou.push('filiais de treino');
-    if ((f.turnos || []).join() !== (user.turnos || []).join()) mudou.push(`horário de treino (${textoTurnos(f.turnos)})`);
+    if ((f.turnos || []).join() !== (user.turnos || []).join() || (f.horarios || []).join() !== (user.horarios || []).join()) mudou.push(`horário de treino (${textoTurnos(f.turnos)})`);
     setDB((d) => {
       const x = d.alunos.find((a) => a.id === user.id);
       Object.assign(x, dados);
       if (f.turnos?.length) x.turnos = f.turnos;
       else delete x.turnos;
+      if (f.horarios?.length) x.horarios = f.horarios;
+      else delete x.horarios;
       if (extras.length) x.filiaisExtras = extras;
       else delete x.filiaisExtras;
       for (const fid of novasFiliais) notify(d, 'filial:' + fid, 'Aluno de outra filial treinando aqui', `${dados.nome} (${filialNome(d, user.filialId)}) também treina nesta filial e já aparece na sua chamada.`);
@@ -58,7 +62,7 @@ export default function Perfil({ user }) {
         </Card>
         <Card title="⏰ Horário de treino">
           <p className="small muted" style={{ marginTop: 0 }}>Marque em qual horário você treina (pode ser mais de um). Você aparece na chamada do professor somente nesses horários.</p>
-          <TurnosInput value={f.turnos} onChange={(v) => setF({ ...f, turnos: v })} />
+          <HorarioTreinoInput filialIds={filiaisDoAluno({ ...user, filiaisExtras: f.filiaisExtras })} value={f} onChange={(v) => setF({ ...f, ...v })} />
           {!f.turnos?.length && <div className="xs muted mt">Sem horário definido, seu nome aparece em todas as chamadas.</div>}
         </Card>
         <Card title="🏯 Filiais onde treino">

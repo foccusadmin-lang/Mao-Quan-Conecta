@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB, frequencia, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, filialNome, TURNOS, nomeTurno, turnoAgora, alunoNoTurno, presencaNoTurno } from '../../lib/db';
-import { TurnosBadge } from '../../components/Turnos';
+import { useDB, setDB, frequencia, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, filialNome, TURNOS, nomeTurno, turnoAgora, alunoNoTurno, presencaNoTurno, horariosFilial, horarioAgora, alunoNoHorario, presencaNoHorario, rotuloHorario, diaDaData, DIAS_SEMANA } from '../../lib/db';
+import { TurnosBadge, HorariosFilialEditor } from '../../components/Turnos';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field, Search } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -24,12 +24,24 @@ export default function Presenca({ user }) {
   const alunos = filial
     ? db.alunos.filter((a) => a.status === 'aprovado' && alunoNaFilial(a, filial.id) && (filialExtraDoAluno(a, filial.id) || professorVeAluno(db, user, a))).sort((a, b) => a.nome.localeCompare(b.nome))
     : [];
+  // Vários horários no mesmo período (ex.: 18:00–19:30, 19:30–20:00…): a chamada é de um horário
+  // ...e a grade é a do dia da semana da chamada (ex.: segunda 9h–10h, 10h20–11h30)
+  const gradeTurno = horariosFilial(filial, turno, diaDaData(data));
+  const refHorario = () => (data === todayISO() ? new Date() : new Date(data + 'T00:00'));
+  const [horarioId, setHorarioId] = useState(() => horarioAgora(filial, turno, refHorario())?.id || '');
+  useEffect(() => {
+    if (!gradeTurno.some((h) => h.id === horarioId)) setHorarioId(horarioAgora(filial, turno, refHorario())?.id || '');
+  }, [turno, data, filial?.id, gradeTurno.map((h) => h.id).join()]);
+  const horario = gradeTurno.find((h) => h.id === horarioId) || null;
+  const naSessao = (a) => alunoNoTurno(a, turno) && alunoNoHorario(a, horario, filial);
+  const presNaSessao = (p) => presencaNoTurno(p, turno) && presencaNoHorario(p, horario);
+  const rotuloSessao = turno ? nomeTurno(turno) + (horario ? ' ' + rotuloHorario(horario) : '') : '';
   // Chamada só com quem treina no horário escolhido (aluno sem horário definido aparece em todos)
-  const daChamada = alunos.filter((a) => alunoNoTurno(a, turno));
+  const daChamada = alunos.filter(naSessao);
   const meusIds = new Set(daChamada.map((a) => a.id)); // só os alunos das modalidades deste professor, neste horário
   const [q, setQ] = useState('');
   const lista = (tab === 'chamada' ? daChamada : alunos).filter((a) => (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())); // só filtra a exibição
-  const doDia = db.presencas.filter((p) => p.filialId === filial?.id && p.data === data && meusIds.has(p.alunoId) && presencaNoTurno(p, turno));
+  const doDia = db.presencas.filter((p) => p.filialId === filial?.id && p.data === data && meusIds.has(p.alunoId) && presNaSessao(p));
 
   // Sincroniza: pré-marca quem já confirmou pelo app ou chamada anterior
   const chave = doDia.map((p) => p.alunoId + p.confirmada).join();
@@ -37,7 +49,7 @@ export default function Presenca({ user }) {
     const m = {};
     doDia.forEach((p) => (m[p.alunoId] = true));
     setMarcados(m);
-  }, [data, chave, turno]);
+  }, [data, chave, turno, horarioId]);
   useEffect(() => {
     if (filial) setTrava({ aulasSemana: filial.aulasSemana, minFrequencia: filial.minFrequencia, maxFaltas: filial.maxFaltas });
   }, [filial?.id]);
@@ -47,20 +59,21 @@ export default function Presenca({ user }) {
   const salvar = () => {
     setDB((d) => {
       // Mexe só na chamada dos próprios alunos (não apaga a de outro professor da mesma filial)
-      d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && meusIds.has(p.alunoId) && presencaNoTurno(p, turno) && !marcados[p.alunoId]));
+      d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && meusIds.has(p.alunoId) && presNaSessao(p) && !marcados[p.alunoId]));
       for (const a of daChamada) {
         if (!marcados[a.id]) continue;
         // Cada filial tem a sua chamada: a presença de outra filial no mesmo dia não é tocada
         // ...e cada horário também: a presença da manhã não é mexida na chamada da noite
-        const ex = d.presencas.find((p) => p.alunoId === a.id && p.data === data && p.filialId === filial.id && presencaNoTurno(p, turno));
+        const ex = d.presencas.find((p) => p.alunoId === a.id && p.data === data && p.filialId === filial.id && presNaSessao(p));
         if (ex) {
           ex.confirmada = true;
           if (turno) ex.turno = turno;
-        } else d.presencas.push({ id: uid('pz'), alunoId: a.id, filialId: filial.id, data, ...(turno ? { turno } : {}), origem: 'professor', confirmada: true });
+          if (horario) ex.horario = horario.id;
+        } else d.presencas.push({ id: uid('pz'), alunoId: a.id, filialId: filial.id, data, ...(turno ? { turno } : {}), ...(horario ? { horario: horario.id } : {}), origem: 'professor', confirmada: true });
       }
-      notify(d, 'filial:' + filial.id, 'Chamada registrada', `Presenças de ${fmtDate(data)}${turno ? ` (${nomeTurno(turno)})` : ''} confirmadas pelo Laoshi.`);
+      notify(d, 'filial:' + filial.id, 'Chamada registrada', `Presenças de ${fmtDate(data)}${rotuloSessao ? ` (${rotuloSessao})` : ''} confirmadas pelo Laoshi.`);
     });
-    toast(`Chamada${turno ? ' da ' + nomeTurno(turno).toLowerCase() : ''} salva.`);
+    toast(`Chamada${rotuloSessao ? ' — ' + rotuloSessao : ''} salva.`);
   };
 
   const pelosAlunos = doDia.filter((p) => p.origem === 'aluno' && !p.confirmada).length;
@@ -70,11 +83,11 @@ export default function Presenca({ user }) {
       <PageHead title="Presença & Trava Mínima" sub={filial.nome}>
         <Search value={q} onChange={setQ} placeholder="Buscar aluno" />
       </PageHead>
-      <Tabs tabs={[['chamada', '✅ Chamada'], ['historico', '📈 Histórico e gráficos'], ['trava', '🔒 Trava mínima']]} value={tab} onChange={setTab} />
+      <Tabs tabs={[['chamada', '✅ Chamada'], ['historico', '📈 Histórico e gráficos'], ['horarios', '🕐 Horários de aula'], ['trava', '🔒 Trava mínima']]} value={tab} onChange={setTab} />
 
       {tab === 'chamada' && (
         <Card
-          title={`Chamada do dia${turno ? ' — ' + nomeTurno(turno) : ''}`}
+          title={`Chamada do dia${rotuloSessao ? ' — ' + rotuloSessao : ''}`}
           actions={
             <>
               <input type="date" value={data} max={todayISO()} onChange={(e) => setData(e.target.value)} style={{ maxWidth: 170 }} />
@@ -89,11 +102,24 @@ export default function Presenca({ user }) {
               </button>
             ))}
           </div>
+          {turno && (filial.horarios || []).some((h) => h.turno === turno) && gradeTurno.length === 0 && (
+            <div className="xs muted mb">Sem horário de aula cadastrado para {DIAS_SEMANA.find(([d]) => d === diaDaData(data))?.[1]} neste período — chamada do período inteiro.</div>
+          )}
+          {gradeTurno.length > 0 && (
+            <div className="row mb" style={{ gap: 6, flexWrap: 'wrap' }}>
+              {gradeTurno.map((h) => (
+                <button key={h.id} type="button" className={`btn sm ${horarioId === h.id ? 'dark' : 'ghost'}`} onClick={() => setHorarioId(h.id)}>
+                  🕐 {rotuloHorario(h)} <span className="xs" style={{ opacity: 0.75 }}>({alunos.filter((a) => alunoNoTurno(a, turno) && alunoNoHorario(a, h, filial)).length})</span>
+                </button>
+              ))}
+              <button type="button" className={`btn sm ${!horarioId ? 'dark' : 'ghost'}`} onClick={() => setHorarioId('')}>Período inteiro</button>
+            </div>
+          )}
           {turno && alunos.some((a) => !a.turnos?.length) && (
             <div className="xs muted mb">Alunos sem horário definido aparecem em todas as chamadas até escolherem o horário em “Meus Dados” (ou você definir na ficha do aluno).</div>
           )}
           {pelosAlunos > 0 && <div className="alert gold mb small">📲 {pelosAlunos} aluno(s) marcaram presença pelo app — já pré-selecionados. Salve para confirmar.</div>}
-          {lista.length === 0 && <Empty>{turno ? `Nenhum aluno neste horário (${nomeTurno(turno)}).` : 'Nenhum aluno ativo na filial.'}</Empty>}
+          {lista.length === 0 && <Empty>{turno ? `Nenhum aluno neste horário (${rotuloSessao}).` : 'Nenhum aluno ativo na filial.'}</Empty>}
           {lista.map((a) => {
             const p = doDia.find((x) => x.alunoId === a.id);
             const outra = !p && db.presencas.find((x) => x.alunoId === a.id && x.data === data && x.filialId !== filial.id);
@@ -104,7 +130,7 @@ export default function Presenca({ user }) {
                 <div className="grow">
                   <div style={{ fontWeight: 600 }}>{a.nome} {a.saude?.restricoes && <span title={a.saude.restricoes}>⚕️</span>}</div>
                   <Faixa idx={a.faixaIdx} />
-                  {(!turno || !a.turnos?.length) && <div><TurnosBadge turnos={a.turnos} /></div>}
+                  {(!turno || !a.turnos?.length || (horario && !a.horarios?.includes(horario.id))) && <div><TurnosBadge turnos={a.turnos} horarios={a.horarios} /></div>}
                   {filialExtraDoAluno(a, filial.id) && <div className="xs muted">🔁 Filial principal: {filialNome(db, a.filialId)}</div>}
                 </div>
                 {outra && <span className="badge" title="Presença registrada em outra filial nesta data">📍 {filialNome(db, outra.filialId)}</span>}
@@ -143,6 +169,8 @@ export default function Presenca({ user }) {
           </Card>
         </div>
       )}
+
+      {tab === 'horarios' && <HorariosFilialEditor filial={filial} />}
 
       {tab === 'trava' && trava && (
         <Card title="Trava de presença mínima para o pré-exame">
