@@ -11,7 +11,7 @@ export default function AlunoHome({ user }) {
   const fr = frequencia(db, user);
   const hoje = todayISO();
   const eventos = db.eventos.filter((e) => e.publico === 'todos' && e.data >= hoje).sort((a, b) => a.data.localeCompare(b.data)).slice(0, 3);
-  const materiais = db.materiais.filter((m) => m.publico === 'aluno' && m.faixaIdx === user.faixaIdx).length;
+  const materiais = db.materiais.filter((m) => m.publico === 'aluno' && m.faixaIdx <= user.faixaIdx).length;
   const prof = db.professores.find((p) => p.id === db.filiais.find((f) => f.id === user.filialId)?.professorId);
 
   return (
@@ -53,7 +53,7 @@ export default function AlunoHome({ user }) {
           {user.preExame && <div className={`alert ${user.preExame.status === 'apto' ? 'ok' : 'gold'} mt small`}>{user.preExame.status === 'apto' ? '✅ Você está APTO para o próximo exame!' : '💪 Seu professor indicou reforço antes do exame.'}</div>}
         </Card>
         <Card title="🎬 Meu conteúdo" actions={<Link to="conteudo" className="btn sm ghost">Abrir</Link>}>
-          <p style={{ margin: 0 }}>{materiais} materiais liberados para a sua faixa.</p>
+          <p style={{ margin: 0 }}>{materiais} materiais liberados — sua faixa e as anteriores.</p>
         </Card>
         <Card title="📅 Próximos eventos" actions={<Link to="eventos" className="btn sm ghost">Ver</Link>}>
           {eventos.length === 0 ? <Empty icon="🗓️">Nenhum evento.</Empty> : eventos.map((e) => (
