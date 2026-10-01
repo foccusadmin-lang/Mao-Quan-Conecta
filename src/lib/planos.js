@@ -50,11 +50,39 @@ export function valorModalidades(f, nomes = []) {
   return ofertadas.reduce((s, m) => s + m.valor, 0);
 }
 
+/**
+ * Plano família: o combo cobre UMA modalidade por pessoa. Cada modalidade a mais (do titular ou de um beneficiário)
+ * soma o adicional da filial. filial.planos.familiaAdicional (R$); sem ele, vale o adicional da condição especial (Sede: R$ 50).
+ * Com "todas as modalidades" marcado, o combo cobre tudo para todos (sem adicional).
+ */
+export const adicionalFamilia = (f) => {
+  const v = f?.planos?.familiaAdicional;
+  if (v !== undefined && v !== null && v !== '' && +v >= 0) return +v;
+  return condicaoCombinada(f)?.adicional || 0;
+};
+
+/** Pessoas do plano família com as modalidades de cada uma (beneficiário antigo, sem escolha registrada, conta 1 modalidade) */
+export function pessoasFamilia(f, plano) {
+  const ofertadas = modalidadesOfertadas(f).map((m) => m.nome);
+  const so = (lista) => (lista || []).filter((n) => ofertadas.includes(n));
+  return [
+    { nome: 'Titular', titular: true, modalidades: so(plano?.modalidades) },
+    ...(plano?.familia?.beneficiarios || []).map((b, i) => ({ nome: b.nome?.trim() || `Beneficiário ${i + 1}`, modalidades: Array.isArray(b.modalidades) ? so(b.modalidades) : null })),
+  ];
+}
+
+/** Quantas modalidades adicionais (além da 1ª de cada pessoa) o plano família tem */
+export const extrasFamilia = (f, plano) =>
+  !plano || plano.tipo !== 'familia' || plano.todas ? 0 : pessoasFamilia(f, plano).reduce((s, p) => s + Math.max(0, (p.modalidades?.length || 0) - 1), 0);
+
 /** Valor mensal do plano do aluno. Sem planos configurados na filial, vale a mensalidade base. */
 export function valorPlano(f, plano) {
   const base = +f?.mensalidade || 0;
   if (!temPlanos(f) || !plano) return base;
-  if (plano.tipo === 'familia') return +f.planos.familia?.[plano.combo] || base;
+  if (plano.tipo === 'familia') {
+    const combo = +f.planos.familia?.[plano.combo];
+    return combo ? combo + extrasFamilia(f, plano) * adicionalFamilia(f) : base;
+  }
   if (plano.tipo === 'pacote' && pacoteAtivo(f)) return +f.planos.pacote.valor;
   return valorModalidades(f, plano.modalidades) || base;
 }
@@ -67,7 +95,10 @@ export function resumoPlano(f, plano) {
   if (!temPlanos(f) || !plano) return 'Mensalidade';
   if (plano.tipo === 'pacote') return 'Pacote completo';
   const mods = modalidadesDoPlano(f, plano);
-  if (plano.tipo === 'familia') return `Família (${plano.combo} pessoas)${mods.length ? ' · ' + (plano.todas ? 'todas as modalidades' : mods.join(' + ')) : ''}`;
+  if (plano.tipo === 'familia') {
+    const extras = extrasFamilia(f, plano);
+    return `Família (${plano.combo} pessoas)${mods.length ? ' · ' + (plano.todas ? 'todas as modalidades' : mods.join(' + ')) : ''}${extras ? ` · ${extras} modalidade${extras > 1 ? 's' : ''} adicional${extras > 1 ? 'is' : ''}` : ''}`;
+  }
   return mods.join(' + ') || 'Mensalidade';
 }
 
@@ -83,6 +114,10 @@ export function validarPlano(f, plano) {
     const bs = plano.familia?.beneficiarios || [];
     if (bs.length !== plano.combo - 1 || bs.some((b) => !b.nome?.trim())) return `Informe o nome dos ${plano.combo - 1} beneficiário(s).`;
     if (bs.some((b) => b.email && !/^\S+@\S+\.\S+$/.test(b.email.trim()))) return 'E-mail de beneficiário inválido.';
+    if (!plano.todas) {
+      const sem = pessoasFamilia(f, plano).find((p) => !p.titular && p.modalidades && !p.modalidades.length);
+      if (sem) return `Escolha a modalidade de ${sem.nome}.`;
+    }
   }
   return '';
 }
