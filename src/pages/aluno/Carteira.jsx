@@ -4,6 +4,7 @@ import { useDB, situacaoAluno } from '../../lib/db';
 import { PageHead, Card, Faixa, NiveisModalidade } from '../../components/ui';
 import { useQR } from '../../components/shared';
 import { Carteirinha, ExportButtons, dadosCarteirinha } from '../../components/Carteirinha';
+import FotoCarteirinha from '../../components/FotoCarteirinha';
 
 function CartaoTipo({ db, user, tipo, titulo, liberado, motivo }) {
   const frente = useRef(null);
@@ -26,7 +27,7 @@ export default function AlunoCarteira({ user }) {
   const temPago = db.pagamentos.some((p) => p.pessoaId === user.id && p.status === 'pago');
   const liberado = !fin.bloqueado && (temPago || user.isento);
   const motivo = 'Download liberado após a confirmação do pagamento.';
-  const faltaDados = !user.rg || !user.cpf || !user.nascimento || !user.foto;
+  const faltaDados = !user.rg || !user.cpf || !user.nascimento || !(user.fotoCarteirinha || user.foto);
 
   return (
     <>
@@ -45,6 +46,7 @@ export default function AlunoCarteira({ user }) {
 
         <CartaoTipo db={db} user={user} tipo="aluno" titulo="🪪 Identidade do Praticante" liberado={liberado} motivo={motivo} />
         {user.atleta?.ativo && <CartaoTipo db={db} user={user} tipo="atleta" titulo="🏆 Atleta de Competição" liberado={liberado} motivo={motivo} />}
+        <FotoCarteirinha pessoa={user} colecao="alunos" />
       </div>
       {faltaDados && (
         <Link to="/aluno/perfil" className="alert gold mt" style={{ textDecoration: 'none' }}>

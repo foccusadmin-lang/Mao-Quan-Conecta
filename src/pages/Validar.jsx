@@ -20,7 +20,7 @@ export default function Validar() {
 
   return (
     <Shell>
-      <Avatar src={pessoa?.foto} name={d.n} size="xl" />
+      <Avatar src={pessoa?.fotoCarteirinha || pessoa?.foto} name={d.n} size="xl" />
       <h2 style={{ margin: '12px 0 2px' }}>{d.n}</h2>
       <div className="badge ink">{d.t === 'professor' ? 'PROFESSOR FILIADO' : d.t === 'atleta' ? 'ATLETA DE COMPETIÇÃO' : 'ALUNO FILIADO'}</div>
       <div className="col mt" style={{ gap: 4 }}>

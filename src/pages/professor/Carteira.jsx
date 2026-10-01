@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useDB, professorEmDia } from '../../lib/db';
 import { PageHead, Card } from '../../components/ui';
 import { Carteirinha, ExportButtons, dadosCarteirinha } from '../../components/Carteirinha';
+import FotoCarteirinha from '../../components/FotoCarteirinha';
 
 export default function ProfCarteira({ user }) {
   const db = useDB();
@@ -18,6 +19,7 @@ export default function ProfCarteira({ user }) {
         {!liberado && <div className="alert red mt small">🔒 {motivo}</div>}
         {(!user.rg || !user.cpf || !user.nascimento) && <div className="alert gold mt small">ℹ️ RG, CPF ou data de nascimento não cadastrados — solicite à Central a atualização dos seus dados.</div>}
       </Card>
+      <div className="mt"><FotoCarteirinha pessoa={user} colecao="professores" /></div>
     </>
   );
 }

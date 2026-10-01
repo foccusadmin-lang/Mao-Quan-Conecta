@@ -101,7 +101,7 @@ export function Avatar({ src, name, size = '' }) {
 }
 
 /** Foto de perfil: câmera ou galeria, com recorte e reposicionamento antes de salvar */
-export function PhotoInput({ value, onChange, name }) {
+export function PhotoInput({ value, onChange, name, formato }) {
   const [original, setOriginal] = useState(null); // imagem escolhida, aguardando recorte
   const [camera, setCamera] = useState(false);
   const toque = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
@@ -120,7 +120,13 @@ export function PhotoInput({ value, onChange, name }) {
 
   return (
     <div className="row">
-      <Avatar src={value} name={name} size="lg" />
+      {formato === '3x4' ? (
+        <div style={{ width: 66, height: 88, borderRadius: 6, overflow: 'hidden', background: 'var(--line, #eee)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }} className="xs muted">
+          {value ? <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '3×4'}
+        </div>
+      ) : (
+        <Avatar src={value} name={name} size="lg" />
+      )}
       <div className="col" style={{ gap: 6 }}>
         <div className="row" style={{ gap: 6 }}>
           {toque || !podeWebcam ? (
@@ -142,7 +148,7 @@ export function PhotoInput({ value, onChange, name }) {
         </div>
       </div>
       {camera && <CameraFoto onFoto={(src) => (setCamera(false), setOriginal(src))} onClose={() => setCamera(false)} />}
-      {original && <RecorteFoto src={original} onPronto={(src) => (onChange(src), setOriginal(null))} onClose={() => setOriginal(null)} />}
+      {original && <RecorteFoto src={original} formato={formato} onPronto={(src) => (onChange(src), setOriginal(null))} onClose={() => setOriginal(null)} />}
     </div>
   );
 }
@@ -191,8 +197,14 @@ function CameraFoto({ onFoto, onClose }) {
 const V = 280; // tamanho da área de recorte na tela
 const SAIDA = 500; // tamanho da foto salva
 
-/** Recorte quadrado (exibido em círculo): arrastar para reposicionar, zoom por barra, pinça ou roda do mouse */
-function RecorteFoto({ src, onPronto, onClose }) {
+/**
+ * Recorte quadrado (exibido em círculo) ou 3×4 (foto de documento / carteirinha):
+ * arrastar para reposicionar, zoom por barra, pinça ou roda do mouse
+ */
+function RecorteFoto({ src, formato, onPronto, onClose }) {
+  const tresQuatro = formato === '3x4';
+  const [VW, VH] = tresQuatro ? [240, 320] : [V, V]; // área na tela
+  const [OW, OH] = tresQuatro ? [600, 800] : [SAIDA, SAIDA]; // foto salva
   const [img, setImg] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -205,13 +217,13 @@ function RecorteFoto({ src, onPronto, onClose }) {
     i.src = src;
   }, [src]);
 
-  const base = img ? V / Math.min(img.width, img.height) : 1;
+  const base = img ? Math.max(VW / img.width, VH / img.height) : 1; // a imagem sempre cobre a moldura
   const escala = base * zoom;
   const limitar = (p, z = zoom) => {
     if (!img) return p;
     const s = base * z;
-    const mx = Math.max(0, (img.width * s - V) / 2);
-    const my = Math.max(0, (img.height * s - V) / 2);
+    const mx = Math.max(0, (img.width * s - VW) / 2);
+    const my = Math.max(0, (img.height * s - VH) / 2);
     return { x: Math.min(mx, Math.max(-mx, p.x)), y: Math.min(my, Math.max(-my, p.y)) };
   };
   const mudarZoom = (z) => {
@@ -249,14 +261,15 @@ function RecorteFoto({ src, onPronto, onClose }) {
   const salvar = () => {
     if (!img) return;
     const c = document.createElement('canvas');
-    c.width = c.height = SAIDA;
+    c.width = OW;
+    c.height = OH;
     const ctx = c.getContext('2d');
-    const k = SAIDA / V;
+    const k = OW / VW;
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, SAIDA, SAIDA);
+    ctx.fillRect(0, 0, OW, OH);
     const w = img.width * escala * k;
     const h = img.height * escala * k;
-    ctx.drawImage(img, SAIDA / 2 + pos.x * k - w / 2, SAIDA / 2 + pos.y * k - h / 2, w, h);
+    ctx.drawImage(img, OW / 2 + pos.x * k - w / 2, OH / 2 + pos.y * k - h / 2, w, h);
     onPronto(c.toDataURL('image/jpeg', 0.88));
   };
 
@@ -279,7 +292,7 @@ function RecorteFoto({ src, onPronto, onClose }) {
         onPointerUp={up}
         onPointerCancel={up}
         onWheel={(e) => mudarZoom(zoom * (e.deltaY < 0 ? 1.08 : 0.92))}
-        style={{ width: V, height: V, margin: '0 auto', position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#111', touchAction: 'none', cursor: 'grab', userSelect: 'none' }}
+        style={{ width: VW, height: VH, margin: '0 auto', position: 'relative', overflow: 'hidden', borderRadius: 16, background: '#111', touchAction: 'none', cursor: 'grab', userSelect: 'none' }}
       >
         {img && (
           <img
@@ -289,8 +302,8 @@ function RecorteFoto({ src, onPronto, onClose }) {
             style={{ position: 'absolute', left: '50%', top: '50%', width: img.width * escala, height: img.height * escala, maxWidth: 'none', transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px))`, pointerEvents: 'none' }}
           />
         )}
-        {/* máscara: mostra o círculo que aparece no perfil */}
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', boxShadow: '0 0 0 999px rgba(0,0,0,.55)', border: '2px solid rgba(255,255,255,.9)', pointerEvents: 'none' }} />
+        {/* máscara: mostra o círculo que aparece no perfil (ou a moldura 3×4 inteira) */}
+        <div style={{ position: 'absolute', inset: 0, borderRadius: tresQuatro ? 16 : '50%', boxShadow: '0 0 0 999px rgba(0,0,0,.55)', border: '2px solid rgba(255,255,255,.9)', pointerEvents: 'none' }} />
       </div>
       <div className="row mt" style={{ justifyContent: 'center', gap: 10 }}>
         <span>➖</span>

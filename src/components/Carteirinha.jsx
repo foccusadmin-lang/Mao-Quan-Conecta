@@ -37,7 +37,7 @@ export function dadosCarteirinha(db, pessoa, tipo) {
     graduacao: graduacaoTexto(db, pessoa, tipo),
     escola: filialNome(db, pessoa.filialId),
     validade: validade ? fmtDate(validade) : '—',
-    foto: pessoa.foto,
+    foto: pessoa.fotoCarteirinha || pessoa.foto, // foto 3x4 própria da carteirinha; sem ela, a do perfil
     qrText: `${APP_URL}#/validar/${payload}`,
   };
 }
