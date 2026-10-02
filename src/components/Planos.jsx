@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDB, setDB, flush, departamentos, notify, mensalidadeDoAluno } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { brl, monthISO } from '../lib/utils';
-import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER, adicionalFamilia, extrasFamilia, resumoPlano, validarPlano } from '../lib/planos';
+import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER, adicionalFamilia, extrasFamilia, resumoPlano, validarPlano, adicionalOutrasFiliais } from '../lib/planos';
 import { Card, Field, toast } from './ui';
 
 // ---------------------------------------------------------------------------
@@ -17,6 +17,7 @@ export function PlanosFilialEditor({ filial }) {
     p.pacote ||= { ativo: false, valor: '' };
     p.familia ||= {};
     p.combinada ||= { ativa: false, base: 'Tradicional', adicional: '' };
+    p.outrasFiliais ||= { ativo: false, valor: '' };
     return p;
   };
   const [p, setP] = useState(inicial);
@@ -33,11 +34,13 @@ export function PlanosFilialEditor({ filial }) {
     if (p.pacote.ativo && !(+p.pacote.valor > 0)) return toast('Informe o valor promocional do pacote.');
     if (p.combinada.ativa && p.combinada.base !== BASE_QUALQUER && !p.modalidades[p.combinada.base]?.ativa) return toast('A modalidade-base da condição especial precisa estar oferecida.');
     if (p.combinada.ativa && !(+p.combinada.adicional >= 0 && p.combinada.adicional !== '')) return toast('Informe o valor adicional por modalidade.');
+    if (p.outrasFiliais.ativo && !(+p.outrasFiliais.valor > 0)) return toast('Informe o valor do treino em outras filiais.');
     const limpo = {
       modalidades: Object.fromEntries(Object.entries(p.modalidades).filter(([, m]) => m.ativa || +m.valor > 0).map(([k, m]) => [k, { ativa: !!m.ativa, valor: +m.valor || 0 }])),
       pacote: { ativo: !!p.pacote.ativo, valor: +p.pacote.valor || 0 },
       familia: Object.fromEntries(COMBOS.filter((n) => +p.familia[n] > 0).map((n) => [n, +p.familia[n]])),
       ...(p.combinada.ativa ? { combinada: { ativa: true, base: p.combinada.base, adicional: +p.combinada.adicional } } : {}),
+      ...(p.outrasFiliais.ativo && +p.outrasFiliais.valor > 0 ? { outrasFiliais: { ativo: true, valor: +p.outrasFiliais.valor } } : {}),
       ...(p.familiaAdicional !== undefined && p.familiaAdicional !== '' && +p.familiaAdicional >= 0 ? { familiaAdicional: +p.familiaAdicional } : {}),
     };
     setDB((d) => {
@@ -88,6 +91,21 @@ export function PlanosFilialEditor({ filial }) {
               </p>
             )}
           </>
+        )}
+      </Card>
+
+      <Card title="🏯 Treino em outras filiais">
+        <label className="check">
+          <input type="checkbox" checked={!!p.outrasFiliais.ativo} onChange={(e) => setP({ ...p, outrasFiliais: { ...p.outrasFiliais, ativo: e.target.checked } })} />
+          <div>
+            Cobrar um valor fixo por pessoa para treino em outras filiais
+            <div className="xs muted">Na escolha do plano aparece “🏯 Outras filiais” para o titular e para cada beneficiário. Aluno de outra filial (mesmo isenta ou com mensalidade R$ 0,00) que também treinar aqui paga este valor na mensalidade dele.</div>
+          </div>
+        </label>
+        {p.outrasFiliais.ativo && (
+          <Field label="Valor por pessoa (R$/mês)">
+            <input type="number" min="0" step="0.01" value={p.outrasFiliais.valor} onChange={(e) => setP({ ...p, outrasFiliais: { ...p.outrasFiliais, valor: e.target.value } })} placeholder="50" style={{ maxWidth: 200 }} />
+          </Field>
         )}
       </Card>
 
@@ -164,9 +182,17 @@ export function EscolhaPlano({ filial, value, onChange }) {
     muda({ familia: { ...plano.familia, beneficiarios: benef.map((b, j) => (j === i ? { ...b, modalidades: mods } : b)) } });
   };
   const adicFam = adicionalFamilia(filial);
+  const adicOutras = adicionalOutrasFiliais(filial);
+  // "🏯 Outras filiais": valor fixo por pessoa (titular ou beneficiário) para treinar também em outras filiais
+  const chipOutras = (on, alternar) =>
+    adicOutras > 0 && (
+      <button type="button" className={`btn sm ${on ? 'dark' : 'ghost'}`} onClick={alternar} title="Treina também em outras filiais">
+        {on ? '✓ ' : ''}🏯 Outras filiais · + {brl(adicOutras)}
+      </button>
+    );
   const extrasFam = extrasFamilia(filial, plano);
   // Chips de modalidade de uma pessoa da família: a 1ª está no combo, as demais mostram "+ R$ 50"
-  const chipsFamilia = (lista, alternar) => (
+  const chipsFamilia = (lista, alternar, extra) => (
     <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
       {ofertadas.map((m) => {
         const on = lista.includes(m.nome);
@@ -177,6 +203,7 @@ export function EscolhaPlano({ filial, value, onChange }) {
           </button>
         );
       })}
+      {extra}
     </div>
   );
 
@@ -214,12 +241,14 @@ export function EscolhaPlano({ filial, value, onChange }) {
               </button>
             );
           })}
+          {chipOutras(!!plano.outrasFiliais, () => muda({ outrasFiliais: !plano.outrasFiliais }))}
         </div>
       )}
       {plano.tipo === 'modalidades' && cc && (
         <div className="alert gold small">⭐ <div><b>Condição especial desta filial:</b> {cc.qualquer ? <>a primeira modalidade paga o valor dela ({brl(Math.max(...ofertadas.map((m) => m.valor)))})</> : <>{cc.base} {brl(ofertadas.find((m) => m.nome === cc.base)?.valor || 0)}</>} + <b>{brl(cc.adicional)}</b> por cada modalidade adicional.</div></div>
       )}
       {plano.tipo === 'pacote' && <div className="small">Inclui: <b>{ofertadas.map((m) => m.nome).join(', ')}</b></div>}
+      {plano.tipo === 'pacote' && adicOutras > 0 && <div className="row">{chipOutras(!!plano.outrasFiliais, () => muda({ outrasFiliais: !plano.outrasFiliais }))}</div>}
 
       {plano.tipo === 'familia' && (
         <div className="card" style={{ background: '#faf8f6' }}>
@@ -236,10 +265,13 @@ export function EscolhaPlano({ filial, value, onChange }) {
           {!plano.todas && adicFam > 0 && (
             <div className="alert gold small mb">👨‍👩‍👧 <div>O combo inclui <b>1 modalidade por pessoa</b>. Cada modalidade a mais (do titular ou de um beneficiário) soma <b>+ {brl(adicFam)}</b>/mês.</div></div>
           )}
+          {plano.todas && adicOutras > 0 && (
+            <div className="mb"><b className="small">Titular</b><div className="row" style={{ marginTop: 6 }}>{chipOutras(!!plano.outrasFiliais, () => muda({ outrasFiliais: !plano.outrasFiliais }))}</div></div>
+          )}
           {!plano.todas && (
             <div className="mb">
               <b className="small">Suas modalidades (titular)</b>
-              <div style={{ marginTop: 6 }}>{chipsFamilia(plano.modalidades || [], alterna)}</div>
+              <div style={{ marginTop: 6 }}>{chipsFamilia(plano.modalidades || [], alterna, chipOutras(!!plano.outrasFiliais, () => muda({ outrasFiliais: !plano.outrasFiliais })))}</div>
             </div>
           )}
           <b className="small">Beneficiários (você é o titular e responsável pelo pagamento)</b>
@@ -254,10 +286,11 @@ export function EscolhaPlano({ filial, value, onChange }) {
                   {b.cadastrado === false && <span className="hint">Ainda sem cadastro — ficará isento ao se cadastrar</span>}
                 </Field>
               </div>
+              {plano.todas && adicOutras > 0 && <div className="row">{chipOutras(!!b.outrasFiliais, () => muda({ familia: { ...plano.familia, beneficiarios: benef.map((x, j) => (j === i ? { ...x, outrasFiliais: !x.outrasFiliais } : x)) } }))}</div>}
               {!plano.todas && (
                 <>
                   <div className="xs muted" style={{ marginBottom: 4 }}>Modalidades de {b.nome?.trim() || `beneficiário ${i + 1}`}{!Array.isArray(b.modalidades) && ' (ainda não informadas — conta 1 modalidade)'}</div>
-                  {chipsFamilia(b.modalidades || [], (nome) => alternaBenef(i, nome))}
+                  {chipsFamilia(b.modalidades || [], (nome) => alternaBenef(i, nome), chipOutras(!!b.outrasFiliais, () => muda({ familia: { ...plano.familia, beneficiarios: benef.map((x, j) => (j === i ? { ...x, outrasFiliais: !x.outrasFiliais } : x)) } })))}
                 </>
               )}
             </div>
@@ -283,7 +316,7 @@ export async function salvarPlanoAluno(alunoId, plano) {
   const limpo = {
     ...plano,
     modalidades: plano.tipo === 'pacote' ? [] : plano.modalidades || [],
-    familia: plano.tipo === 'familia' ? { beneficiarios: (plano.familia?.beneficiarios || []).map((b) => ({ nome: b.nome.trim(), email: (b.email || '').trim().toLowerCase(), ...(Array.isArray(b.modalidades) ? { modalidades: b.modalidades } : {}) })) } : undefined,
+    familia: plano.tipo === 'familia' ? { beneficiarios: (plano.familia?.beneficiarios || []).map((b) => ({ nome: b.nome.trim(), email: (b.email || '').trim().toLowerCase(), ...(Array.isArray(b.modalidades) ? { modalidades: b.modalidades } : {}), ...(b.outrasFiliais ? { outrasFiliais: true } : {}) })) } : undefined,
     combo: plano.tipo === 'familia' ? plano.combo : undefined,
     todas: plano.tipo === 'familia' ? !!plano.todas : undefined,
     atualizadoEm: new Date().toISOString(),

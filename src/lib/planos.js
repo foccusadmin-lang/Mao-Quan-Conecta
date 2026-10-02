@@ -75,8 +75,22 @@ export function pessoasFamilia(f, plano) {
 export const extrasFamilia = (f, plano) =>
   !plano || plano.tipo !== 'familia' || plano.todas ? 0 : pessoasFamilia(f, plano).reduce((s, p) => s + Math.max(0, (p.modalidades?.length || 0) - 1), 0);
 
+/**
+ * Treino em outras filiais (ex.: Sede): valor fixo por pessoa somado à mensalidade.
+ * filial.planos.outrasFiliais = { ativo, valor }. Na escolha do plano, cada pessoa (titular e beneficiários) marca
+ * "Outras filiais"; e aluno de outra filial que também treina nesta paga este valor na mensalidade dele.
+ */
+export const adicionalOutrasFiliais = (f) => (f?.planos?.outrasFiliais?.ativo && +f.planos.outrasFiliais.valor > 0 ? +f.planos.outrasFiliais.valor : 0);
+/** Quantas pessoas do plano marcaram "Outras filiais" */
+export const pessoasOutrasFiliais = (plano) =>
+  !plano ? 0 : (plano.outrasFiliais ? 1 : 0) + (plano.tipo === 'familia' ? (plano.familia?.beneficiarios || []).filter((b) => b.outrasFiliais).length : 0);
+
 /** Valor mensal do plano do aluno. Sem planos configurados na filial, vale a mensalidade base. */
 export function valorPlano(f, plano) {
+  const v = valorPlanoBase(f, plano);
+  return temPlanos(f) && plano ? v + pessoasOutrasFiliais(plano) * adicionalOutrasFiliais(f) : v;
+}
+function valorPlanoBase(f, plano) {
   const base = +f?.mensalidade || 0;
   if (!temPlanos(f) || !plano) return base;
   if (plano.tipo === 'familia') {
@@ -93,13 +107,14 @@ export const modalidadesDoPlano = (f, plano) =>
 /** Texto curto: "Sanda + Tai Chi Chuan", "Pacote completo", "Família (3 pessoas) · Sanda" */
 export function resumoPlano(f, plano) {
   if (!temPlanos(f) || !plano) return 'Mensalidade';
-  if (plano.tipo === 'pacote') return 'Pacote completo';
+  if (plano.tipo === 'pacote') return 'Pacote completo' + (plano.outrasFiliais && adicionalOutrasFiliais(f) ? ' + outras filiais' : '');
   const mods = modalidadesDoPlano(f, plano);
   if (plano.tipo === 'familia') {
     const extras = extrasFamilia(f, plano);
-    return `Família (${plano.combo} pessoas)${mods.length ? ' · ' + (plano.todas ? 'todas as modalidades' : mods.join(' + ')) : ''}${extras ? ` · ${extras} modalidade${extras > 1 ? 's' : ''} adicional${extras > 1 ? 'is' : ''}` : ''}`;
+    const outras = adicionalOutrasFiliais(f) ? pessoasOutrasFiliais(plano) : 0;
+    return `Família (${plano.combo} pessoas)${mods.length ? ' · ' + (plano.todas ? 'todas as modalidades' : mods.join(' + ')) : ''}${extras ? ` · ${extras} modalidade${extras > 1 ? 's' : ''} adicional${extras > 1 ? 'is' : ''}` : ''}${outras ? ` · ${outras} em outras filiais` : ''}`;
   }
-  return mods.join(' + ') || 'Mensalidade';
+  return (mods.join(' + ') || 'Mensalidade') + (plano.outrasFiliais && adicionalOutrasFiliais(f) ? ' + outras filiais' : '');
 }
 
 /** Retorna mensagem de erro ou '' */

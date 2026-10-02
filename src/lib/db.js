@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026, GRAD_MODALIDADES_PADRAO } from './seed';
-import { valorPlano, resumoPlano, temPlanos, modalidadesDoPlano } from './planos';
+import { valorPlano, resumoPlano, temPlanos, modalidadesDoPlano, adicionalOutrasFiliais } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
 // professores antes de filiais: ao tirar um professor de uma filial adicional, o cadastro dele é gravado primeiro
@@ -592,9 +592,19 @@ export function professorVeAluno(db, user, a) {
  * Valor da mensalidade do aluno: o padrão (calculado pelo plano/filial) ou um valor personalizado
  * definido pelo professor ou pela Central (desconto, benefício…).
  */
+/** Filiais extras do aluno que cobram o treino de aluno de outra filial: [{ filial, valor }] */
+export const treinoEmOutrasFiliais = (db, a) =>
+  (a?.filiaisExtras || [])
+    .filter((id) => id !== a.filialId)
+    .map((id) => db.filiais.find((x) => x.id === id))
+    .filter((x) => x && adicionalOutrasFiliais(x) > 0)
+    .map((x) => ({ filial: x, valor: adicionalOutrasFiliais(x) }));
+
 export function mensalidadeDoAluno(db, a) {
   const f = db.filiais.find((x) => x.id === a?.filialId);
-  const padrao = valorPlano(f, a?.plano);
+  // Também treina em outra filial que cobra o treino de aluno de fora (ex.: Sede + R$ 50): soma na mensalidade
+  const visitas = treinoEmOutrasFiliais(db, a);
+  const padrao = valorPlano(f, a?.plano) + visitas.reduce((s, v) => s + v.valor, 0);
   const p = a?.mensalidadePersonalizada;
   if (p && p.valor != null && p.valor !== '' && +p.valor >= 0) return { valor: +p.valor, padrao, personalizada: true, motivo: p.motivo || '', por: p.por };
   return { valor: padrao, padrao, personalizada: false };
@@ -666,7 +676,7 @@ export function rotinaFinanceira() {
       const fil = draft.filiais.find((f) => f.id === a.filialId);
       draft.pagamentos.push({
         id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,
-        descricao: `Mensalidade ${comp}${temPlanos(fil) && a.plano ? ` — ${resumoPlano(fil, a.plano)}` : ""}`, valor: mensalidadeDoAluno(draft, a).valor, ...(mensalidadeDoAluno(draft, a).personalizada ? { valorPadrao: mensalidadeDoAluno(draft, a).padrao, personalizada: true } : {}), vencimento: `${comp}-${diaDe(a)}`,
+        descricao: `Mensalidade ${comp}${temPlanos(fil) && a.plano ? ` — ${resumoPlano(fil, a.plano)}` : ""}${treinoEmOutrasFiliais(draft, a).map((v) => ` + treino em ${v.filial.nome}`).join('')}`, valor: mensalidadeDoAluno(draft, a).valor, ...(mensalidadeDoAluno(draft, a).personalizada ? { valorPadrao: mensalidadeDoAluno(draft, a).padrao, personalizada: true } : {}), vencimento: `${comp}-${diaDe(a)}`,
         status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
       });
       mudou = true;
