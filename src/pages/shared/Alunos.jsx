@@ -640,7 +640,7 @@ function PlanoDoAluno({ a, user }) {
       {a.plano && temPlanos(filial) && (
         <div className="alert ink">Plano atual: <b>{resumoPlano(filial, a.plano)}</b> · {brl(valorPlano(filial, a.plano))}/mês</div>
       )}
-      <EscolhaPlano filial={filial} value={plano} onChange={setPlano} />
+      <EscolhaPlano filial={filial} value={plano} onChange={setPlano} equipe />
       {temPlanos(filial) && <div><button className="btn" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar plano'}</button></div>}
       {!a.isento && (
         <div className="grid g2">

@@ -98,8 +98,8 @@ export function PlanosFilialEditor({ filial }) {
         <label className="check">
           <input type="checkbox" checked={!!p.outrasFiliais.ativo} onChange={(e) => setP({ ...p, outrasFiliais: { ...p.outrasFiliais, ativo: e.target.checked } })} />
           <div>
-            Cobrar um valor fixo por pessoa para treino em outras filiais
-            <div className="xs muted">Na escolha do plano aparece “🏯 Outras filiais” para o titular e para cada beneficiário. Aluno de outra filial (mesmo isenta ou com mensalidade R$ 0,00) que também treinar aqui paga este valor na mensalidade dele.</div>
+            Oferecer “Treino em outra filial” (valor fixo por pessoa)
+            <div className="xs muted">Ao editar o plano do aluno (Financeiro → ✏️ editar mensalidade ou ficha do aluno), o professor ou a Central marcam “🏯 Treino em outra filial” no titular e/ou em cada beneficiário. O valor é somado à mensalidade; o valor do combo não muda.</div>
           </div>
         </label>
         {p.outrasFiliais.ativo && (
@@ -151,7 +151,7 @@ export function PlanosFilialEditor({ filial }) {
 // ---------------------------------------------------------------------------
 // Aluno (ou professor/Central pelo aluno): escolha do plano
 // ---------------------------------------------------------------------------
-export function EscolhaPlano({ filial, value, onChange }) {
+export function EscolhaPlano({ filial, value, onChange, equipe }) {
   const ofertadas = modalidadesOfertadas(filial);
   const cc = condicaoCombinada(filial);
   // Rótulo do preço de cada modalidade: com a condição especial valendo, as adicionais mostram "+ R$ 50"
@@ -182,12 +182,13 @@ export function EscolhaPlano({ filial, value, onChange }) {
     muda({ familia: { ...plano.familia, beneficiarios: benef.map((b, j) => (j === i ? { ...b, modalidades: mods } : b)) } });
   };
   const adicFam = adicionalFamilia(filial);
-  const adicOutras = adicionalOutrasFiliais(filial);
+  // Só professor / Central marcam "Treino em outra filial" (o aluno vê o valor, mas não marca)
+  const adicOutras = equipe ? adicionalOutrasFiliais(filial) : 0;
   // "🏯 Outras filiais": valor fixo por pessoa (titular ou beneficiário) para treinar também em outras filiais
   const chipOutras = (on, alternar) =>
     adicOutras > 0 && (
-      <button type="button" className={`btn sm ${on ? 'dark' : 'ghost'}`} onClick={alternar} title="Treina também em outras filiais">
-        {on ? '✓ ' : ''}🏯 Outras filiais · + {brl(adicOutras)}
+      <button type="button" className={`btn sm ${on ? 'dark' : 'ghost'}`} onClick={alternar} title="Treina também em outra filial">
+        {on ? '✓ ' : ''}🏯 Treino em outra filial · + {brl(adicOutras)}
       </button>
     );
   const extrasFam = extrasFamilia(filial, plano);
@@ -476,7 +477,7 @@ function PlanoNaCobranca({ aluno, onPlanoSalvo }) {
       </div>
       {editando && (
         <div className="col mt">
-          <EscolhaPlano filial={filial} value={plano} onChange={setPlano} />
+          <EscolhaPlano filial={filial} value={plano} onChange={setPlano} equipe />
           <div className="row" style={{ gap: 6 }}>
             <button type="button" className="btn" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar plano'}</button>
             <button type="button" className="btn ghost" onClick={() => setEditando(false)}>Cancelar</button>
