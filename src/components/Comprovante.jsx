@@ -66,20 +66,59 @@ export function EnviarComprovante({ pagamentoId }) {
     }
   };
 
+  // Comprovante enviado errado (ou recusado): o pagador remove e envia outro
+  const remover = async (c) => {
+    if (!window.confirm(`Remover o comprovante “${c.nome}”?`)) return;
+    setEnviando(true);
+    try {
+      const { data, error } = await supabase.rpc('mq_remover_comprovante', { p_pagamento: p.id, p_caminho: c.caminho });
+      if (error) throw error;
+      aplicarDoServidor('pagamentos', p.id, data);
+      toast('Comprovante removido. Agora envie o comprovante correto.');
+    } catch (err) {
+      toast('Não foi possível remover: ' + err.message);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   const ultimo = p.comprovantes?.at(-1);
+  const recusado = p.analise === 'recusado';
   return (
     <div className="card" style={{ width: '100%', background: '#faf8f6', textAlign: 'left' }}>
       <b className="small">📎 Comprovante de pagamento</b>
       {p.analise === 'enviado' && ultimo && (
         <div className="alert gold small" style={{ margin: '8px 0' }}>⏳ Enviado em {dataHora(ultimo.enviadoEm)} — aguardando conferência.</div>
       )}
-      {p.analise === 'recusado' && (
-        <div className="alert red small" style={{ margin: '8px 0' }}>⚠️ Comprovante não confirmado: {p.motivoRecusa || 'confira os dados'}. Envie um novo.</div>
+      {recusado && (
+        <div className="alert red small" style={{ margin: '8px 0' }}>
+          <div>
+            ⚠️ <b>Comprovante recusado</b>{p.motivoRecusa ? `: ${p.motivoRecusa}` : ''}.
+            <div className="xs" style={{ marginTop: 2 }}>Remova o comprovante errado e envie um novo.</div>
+          </div>
+        </div>
       )}
       {!p.analise && <p className="xs muted" style={{ margin: '4px 0 8px' }}>Depois de pagar, envie a foto ou o PDF do comprovante para conferência.</p>}
+      {p.comprovantes?.length > 0 && (
+        <div className="col" style={{ gap: 4, margin: '6px 0' }}>
+          {p.comprovantes.map((c, i) => {
+            const ehRecusado = recusado && i === p.comprovantes.length - 1;
+            return (
+              <div key={c.caminho} className="row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'center' }}>
+                <span className="xs grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  📄 {c.nome} <span className="muted">· {dataHora(c.enviadoEm)}</span> {ehRecusado && <span className="badge red">Recusado</span>}
+                </span>
+                <button type="button" className="btn sm ghost" style={{ color: 'var(--red)' }} disabled={enviando} onClick={() => remover(c)} title="Remover este comprovante">
+                  🗑 Remover
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <input ref={input} type="file" accept="image/*,application/pdf" onChange={escolher} hidden />
       <button type="button" className="btn ok sm block" disabled={enviando} onClick={() => input.current?.click()}>
-        {enviando ? 'Enviando…' : p.analise === 'enviado' ? '📎 Enviar outro comprovante' : '📎 Enviar comprovante'}
+        {enviando ? 'Aguarde…' : recusado ? '📎 Enviar novo comprovante' : p.analise === 'enviado' ? '📎 Enviar outro comprovante' : '📎 Enviar comprovante'}
       </button>
     </div>
   );
@@ -106,7 +145,7 @@ function ArquivoComprovante({ c }) {
   );
 }
 
-const ACOES = { comprovante_enviado: '📎 Comprovante enviado', comprovante_recusado: '⚠️ Comprovante recusado', confirmado: '✅ Pagamento confirmado', cobranca_editada: '✏️ Cobrança editada', valor_ajustado: '💲 Valor ajustado', lancado: '↩ Lançada (pendência anterior)', isencao: '🎓 Isenção' };
+const ACOES = { comprovante_enviado: '📎 Comprovante enviado', comprovante_recusado: '⚠️ Comprovante recusado', comprovante_removido: '🗑 Comprovante removido', confirmado: '✅ Pagamento confirmado', cobranca_editada: '✏️ Cobrança editada', valor_ajustado: '💲 Valor ajustado', lancado: '↩ Lançada (pendência anterior)', isencao: '🎓 Isenção' };
 
 /** Conferência e auditoria de um pagamento (Central / professor responsável) */
 export function ConferenciaPagamento({ pagamentoId, user, nomePessoa, onFeito, podeDecidir = true }) {
@@ -148,6 +187,19 @@ export function ConferenciaPagamento({ pagamentoId, user, nomePessoa, onFeito, p
       <b className="small">📎 Comprovantes ({p.comprovantes?.length || 0})</b>
       {!p.comprovantes?.length && <p className="small muted" style={{ margin: 0 }}>Nenhum comprovante enviado.</p>}
       {[...(p.comprovantes || [])].reverse().map((c) => <ArquivoComprovante key={c.caminho} c={c} />)}
+      {p.comprovantesRemovidos?.length > 0 && (
+        <details>
+          <summary className="xs muted" style={{ cursor: 'pointer' }}>🗑 Comprovantes removidos ({p.comprovantesRemovidos.length}) — histórico de auditoria</summary>
+          <div className="col" style={{ gap: 6, marginTop: 6 }}>
+            {[...p.comprovantesRemovidos].reverse().map((c) => (
+              <div key={c.caminho}>
+                <div className="xs muted">Removido por <b>{c.removidoPor}</b> em {dataHora(c.removidoEm)}</div>
+                <ArquivoComprovante c={c} />
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {podeDecidir && p.status === 'pendente' && (
         <div className="card" style={{ background: '#faf8f6', padding: 12 }}>
