@@ -31,6 +31,7 @@ import PainelInvestidor from './pages/PainelInvestidor';
 
 import ProfDashboard from './pages/professor/Dashboard';
 import Presenca from './pages/professor/Presenca';
+import ChamadaAdmin from './pages/admin/Chamada';
 import Estudo from './pages/professor/Estudo';
 import Filiacao from './pages/professor/Filiacao';
 import ProfCarteira from './pages/professor/Carteira';
@@ -113,6 +114,7 @@ export default function App() {
             <Route path="certificados" element={<Certificados user={user} />} />
             <Route path="documentos" element={<DocumentosAtletas user={user} />} />
             <Route path="alunos" element={<Alunos user={user} />} />
+            <Route path="chamada" element={<ChamadaAdmin user={user} />} />
             <Route path="graduacao" element={<Graduacao user={user} />} />
             <Route path="financeiro" element={<Financeiro user={user} />} />
             <Route path="carteirinhas" element={<Carteirinhas />} />

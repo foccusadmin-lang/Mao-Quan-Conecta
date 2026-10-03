@@ -12,6 +12,7 @@ export const NAVS = {
     ['filiais', '🏯', 'Academias Filiadas'],
     ['professores', '👨‍🏫', 'Professores'],
     ['alunos', '🥋', 'Alunos & Prontuários'],
+    ['chamada', '✅', 'Chamada'],
     ['graduacao', '🎖️', 'Graduação & Pré-Exame'],
     ['financeiro', '💳', 'Financeiro'],
     ['carteirinhas', '🪪', 'Carteirinhas'],
