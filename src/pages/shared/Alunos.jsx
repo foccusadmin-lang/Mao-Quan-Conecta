@@ -56,7 +56,7 @@ export default function Alunos({ user }) {
 
   const base = db.alunos.filter((a) => (!filial || a.filialId === filial || (isAdmin && alunoNaFilial(a, filial))) && professorVeAluno(db, user, a));
   // Alunos de outras filiais que também treinam aqui (dias alternados) — aparecem na chamada; o cadastro fica com a filial principal
-  const visitantes = isAdmin ? [] : db.alunos.filter((a) => a.status === 'aprovado' && filialExtraDoAluno(a, filial)).sort((a, b) => a.nome.localeCompare(b.nome));
+  const visitantes = isAdmin ? [] : db.alunos.filter((a) => a.status === 'aprovado' && filialExtraDoAluno(a, filial) && professorVeAluno(db, user, a)).sort((a, b) => a.nome.localeCompare(b.nome));
   const lista = base
     .filter((a) => filtro === 'todos' || a.status === filtro || (filtro === 'atletas' && a.atleta?.ativo))
     .filter((a) => (a.nome + a.email + (a.matricula || '')).toLowerCase().includes(q.toLowerCase()))

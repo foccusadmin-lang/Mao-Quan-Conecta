@@ -22,7 +22,7 @@ export default function Presenca({ user }) {
 
   // Inclui quem é de outra filial mas também treina aqui (dias alternados)
   const alunos = filial
-    ? db.alunos.filter((a) => a.status === 'aprovado' && alunoNaFilial(a, filial.id) && (filialExtraDoAluno(a, filial.id) || professorVeAluno(db, user, a))).sort((a, b) => a.nome.localeCompare(b.nome))
+    ? db.alunos.filter((a) => a.status === 'aprovado' && alunoNaFilial(a, filial.id) && professorVeAluno(db, user, a)).sort((a, b) => a.nome.localeCompare(b.nome))
     : [];
   // Vários horários no mesmo período (ex.: 18:00–19:30, 19:30–20:00…): a chamada é de um horário
   // ...e a grade é a do dia da semana da chamada (ex.: segunda 9h–10h, 10h20–11h30)
