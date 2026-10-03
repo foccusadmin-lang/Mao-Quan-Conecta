@@ -1,12 +1,48 @@
 ﻿import { useState } from 'react';
-import { useDB, setDB, notify, professorEmDia } from '../../lib/db';
-import { uid, todayISO, readFileAsDataURL, youtubeEmbed } from '../../lib/utils';
+import { useDB, setDB, notify, professorEmDia, aplicarDoServidor } from '../../lib/db';
+import { uid, todayISO, readFileAsDataURL, youtubeEmbed, brl } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Faixa, useConfirm, toast, Empty, FaixaOptions } from '../../components/ui';
+import { supabase } from '../../lib/supabase';
+import { PixBox } from '../../components/shared';
 
 export const TIPOS_MAT = { taolu: ['🥋', 'Taolu'], base: ['🦵', 'Bases'], video: ['🎬', 'Vídeo'], teoria: ['📖', 'Teoria'], texto: ['✍️', 'Texto / Apostila'], pdf: ['📄', 'Documento'], certificado: ['🏅', 'Certificado'] };
 /** Material só de texto (frases, trechos de apostila): não pede link nem arquivo */
 const soTexto = (tipo) => tipo === 'texto';
-const vazio = { titulo: '', tipo: 'video', faixaIdx: 0, url: '', arquivo: null, arquivoNome: '', descricao: '', publico: 'aluno', avancado: false };
+const vazio = { titulo: '', tipo: 'video', faixaIdx: 0, url: '', arquivo: null, arquivoNome: '', descricao: '', publico: 'aluno', avancado: false, pago: false, valor: '', recebedor: '' };
+
+/** Material pago: liberado só depois do pagamento confirmado (quem criou o material não paga) */
+export const materialPago = (m) => !!m?.pago && +m.valor > 0;
+export const pagamentoMaterial = (db, m, pessoaId) =>
+  db.pagamentos.filter((p) => p.tipo === 'material' && p.materialId === m.id && p.pessoaId === pessoaId).sort((a) => (a.status === 'pago' ? -1 : 1))[0];
+export const materialLiberado = (db, m, user) => !materialPago(m) || m.criadoPor === user?.nome || pagamentoMaterial(db, m, user?.id)?.status === 'pago';
+
+/** Modal "Liberar material": gera (no servidor) a cobrança com o valor do material e mostra PIX + envio do comprovante */
+export function LiberarMaterial({ m, user, onClose }) {
+  const db = useDB();
+  const pg = pagamentoMaterial(db, m, user.id);
+  const [gerando, setGerando] = useState(false);
+  const gerar = async () => {
+    setGerando(true);
+    try {
+      const { data, error } = await supabase.rpc('mq_solicitar_material', { p_material: m.id });
+      if (error) throw error;
+      const { id, ...resto } = data;
+      aplicarDoServidor('pagamentos', id, resto);
+    } catch (e) {
+      toast('Não foi possível gerar a cobrança: ' + e.message);
+    } finally {
+      setGerando(false);
+    }
+  };
+  return (
+    <Modal open onClose={onClose} title={'🔒 ' + m.titulo}>
+      <p className="small" style={{ marginTop: 0 }}>Este material é liberado após o pagamento da tarifa de <b>{brl(+m.valor)}</b>. Assim que o professor ou a Central confirmar o pagamento, ele abre automaticamente.</p>
+      {pg?.status === 'pago' && <div className="alert ok">✅ Pagamento confirmado — material liberado.</div>}
+      {!pg && <button className="btn block" disabled={gerando} onClick={gerar}>{gerando ? 'Gerando…' : '💳 Pagar tarifa do material · ' + brl(+m.valor)}</button>}
+      {pg?.status === 'pendente' && <PixBox valor={+pg.valor} descricao={pg.descricao} txid={pg.id} filialId={pg.filialId || undefined} />}
+    </Modal>
+  );
+}
 
 export function MaterialView({ m }) {
   const yt = youtubeEmbed(m.url);
@@ -38,10 +74,13 @@ export default function Materiais({ user }) {
   const salvar = () => {
     if (!edit.titulo) return toast('Informe o título.');
     if (soTexto(edit.tipo) && !edit.descricao?.trim()) return toast('Escreva o texto do material.');
+    if (edit.pago && !(+edit.valor > 0)) return toast('Informe o valor da tarifa do material.');
     setDB((d) => {
-      if (edit.id) Object.assign(d.materiais.find((m) => m.id === edit.id), edit);
+      // Material pago: guarda valor e quem recebe (Central ou professor da filial do aluno)
+      const dados = edit.pago ? { ...edit, valor: +edit.valor, recebedor: edit.recebedor || (isAdmin ? 'central' : 'filial') } : { ...edit, pago: false, valor: '', recebedor: '' };
+      if (edit.id) Object.assign(d.materiais.find((m) => m.id === edit.id), dados);
       else {
-        d.materiais.push({ ...edit, id: uid('m'), criadoEm: todayISO(), criadoPor: user.nome });
+        d.materiais.push({ ...dados, id: uid('m'), criadoEm: todayISO(), criadoPor: user.nome });
         if (edit.publico === 'aluno') notify(d, 'todos', 'Novo material didático', `${edit.titulo} — ${d.config.faixas[edit.faixaIdx]?.nome}`);
       }
     });
@@ -79,6 +118,7 @@ export default function Materiais({ user }) {
                   <span className="badge">{TIPOS_MAT[m.tipo]?.[1]}</span>
                   {m.publico === 'professor' && <span className="badge ink">Professores</span>}
                   {m.avancado && <span className="badge gold">Avançado</span>}
+                  {materialPago(m) && <span className="badge gold" title="Liberado após o pagamento">💰 {brl(+m.valor)}</span>}
                 </div>
               </div>
             </div>
@@ -149,6 +189,18 @@ export default function Materiais({ user }) {
             </Field>}
             {!soTexto(edit.tipo) && <Field label="Descrição"><Inp obj={edit} set={setEdit} k="descricao" type="textarea" /></Field>}
             <label className="check"><Inp obj={edit} set={setEdit} k="avancado" type="checkbox" /> Treinamento avançado (exige tarifa de manutenção em dia)</label>
+            <label className="check"><Inp obj={edit} set={setEdit} k="pago" type="checkbox" /> 💰 Material pago — só é liberado após o pagamento da tarifa</label>
+            {edit.pago && (
+              <div className="form-grid">
+                <Field label="Tarifa do material (R$)"><input type="number" min="0" step="0.01" value={edit.valor} onChange={(e) => setEdit({ ...edit, valor: e.target.value })} placeholder="0,00" /></Field>
+                <Field label="Quem recebe o pagamento">
+                  <select value={edit.recebedor || (isAdmin ? 'central' : 'filial')} onChange={(e) => setEdit({ ...edit, recebedor: e.target.value })}>
+                    <option value="central">Central (PIX da Associação)</option>
+                    <option value="filial">Professor da filial do aluno</option>
+                  </select>
+                </Field>
+              </div>
+            )}
           </div>
         )}
       </Modal>

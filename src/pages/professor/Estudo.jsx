@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useDB, professorEmDia } from '../../lib/db';
 import { PageHead, Card, Modal, Faixa, Empty } from '../../components/ui';
-import { MaterialView, TIPOS_MAT } from '../shared/Materiais';
+import { MaterialView, TIPOS_MAT, materialPago, materialLiberado, LiberarMaterial } from '../shared/Materiais';
+import { brl } from '../../lib/utils';
 import { Institucional } from '../../components/shared';
 
 export default function Estudo({ user }) {
   const db = useDB();
   const [ver, setVer] = useState(null);
+  const [liberar, setLiberar] = useState(null);
   const emDia = professorEmDia(user);
   // Professor acessa todo o acervo: seu nível atual e superiores, além de capacitações exclusivas
   const rank = (m) => (m.publico === 'professor' ? 0 : 1);
@@ -26,10 +28,17 @@ export default function Estudo({ user }) {
                 <div className="row xs" style={{ gap: 6, marginTop: 4 }}>
                   <Faixa idx={m.faixaIdx} />
                   {m.publico === 'professor' && <span className="badge ink">Capacitação</span>}
+                  {materialPago(m) && !materialLiberado(db, m, user) && <span className="badge gold">💰 {brl(+m.valor)}</span>}
                 </div>
               </div>
             </div>
-            <div className="row end mt"><button className="btn sm dark" disabled={!emDia} onClick={() => setVer(m)}>Estudar</button></div>
+            <div className="row end mt">
+              {materialLiberado(db, m, user) ? (
+                <button className="btn sm dark" disabled={!emDia} onClick={() => setVer(m)}>Estudar</button>
+              ) : (
+                <button className="btn sm gold" disabled={!emDia} onClick={() => setLiberar(m)}>🔓 Liberar · {brl(+m.valor)}</button>
+              )}
+            </div>
           </Card>
         ))}
       </div>
@@ -37,6 +46,7 @@ export default function Estudo({ user }) {
       <h3 className="mt">Institucional</h3>
       <Institucional />
       <Modal open={!!ver} onClose={() => setVer(null)} title={ver?.titulo} wide>{ver && <MaterialView m={ver} />}</Modal>
+      {liberar && <LiberarMaterial m={liberar} user={user} onClose={() => setLiberar(null)} />}
     </>
   );
 }

@@ -2,11 +2,13 @@
 import { Link } from 'react-router-dom';
 import { useDB, situacaoAluno } from '../../lib/db';
 import { PageHead, Card, Modal, Faixa, Empty, NiveisModalidade } from '../../components/ui';
-import { MaterialView, TIPOS_MAT } from '../shared/Materiais';
+import { MaterialView, TIPOS_MAT, materialPago, materialLiberado, pagamentoMaterial, LiberarMaterial } from '../shared/Materiais';
+import { brl } from '../../lib/utils';
 
 export default function Conteudo({ user }) {
   const db = useDB();
   const [ver, setVer] = useState(null);
+  const [liberar, setLiberar] = useState(null);
   const fin = situacaoAluno(db, user);
   const doAluno = db.materiais.filter((m) => m.publico === 'aluno');
   const atuais = doAluno.filter((m) => m.faixaIdx === user.faixaIdx);
@@ -30,11 +32,18 @@ export default function Conteudo({ user }) {
           <div className="row xs" style={{ gap: 6, marginTop: 4 }}>
             <span className="badge">{TIPOS_MAT[m.tipo]?.[1]}</span>
             {m.avancado && <span className="badge gold">Avançado</span>}
+            {materialPago(m) && !materialLiberado(db, m, user) && (
+              <span className="badge gold">{pagamentoMaterial(db, m, user.id)?.status === 'pendente' ? '⏳ Aguardando pagamento' : '💰 ' + brl(+m.valor)}</span>
+            )}
           </div>
         </div>
       </div>
       <div className="row end mt">
-        <button className="btn sm" disabled={fin.bloqueado} onClick={() => setVer(m)}>▶ Acessar</button>
+        {materialLiberado(db, m, user) ? (
+          <button className="btn sm" disabled={fin.bloqueado} onClick={() => setVer(m)}>▶ Acessar</button>
+        ) : (
+          <button className="btn sm gold" disabled={fin.bloqueado} onClick={() => setLiberar(m)}>🔓 Liberar · {brl(+m.valor)}</button>
+        )}
       </div>
     </Card>
   );
@@ -90,6 +99,7 @@ export default function Conteudo({ user }) {
         </>
       )}
       <Modal open={!!ver} onClose={() => setVer(null)} title={ver?.titulo} wide>{ver && <MaterialView m={ver} />}</Modal>
+      {liberar && <LiberarMaterial m={liberar} user={user} onClose={() => setLiberar(null)} />}
     </>
   );
 }

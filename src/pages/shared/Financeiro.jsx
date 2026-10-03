@@ -29,7 +29,7 @@ export default function Financeiro({ user }) {
 
   const nomeDe = (id) => db.alunos.find((a) => a.id === id)?.nome || db.professores.find((p) => p.id === id)?.nome || '—';
   const telDe = (id) => db.alunos.find((a) => a.id === id)?.telefone || db.professores.find((p) => p.id === id)?.telefone || '';
-  const escopo = db.pagamentos.filter((p) => (!filial || p.filialId === filial) && (isAdmin || ((p.tipo === 'mensalidade' || p.tipo === 'exame') && professorVeAluno(db, user, db.alunos.find((a) => a.id === p.pessoaId)))));
+  const escopo = db.pagamentos.filter((p) => (!filial || p.filialId === filial) && (isAdmin || ((p.tipo === 'mensalidade' || p.tipo === 'exame' || p.tipo === 'material') && professorVeAluno(db, user, db.alunos.find((a) => a.id === p.pessoaId)))));
   const busca = (p) => nomeDe(p.pessoaId).toLowerCase().includes(q.toLowerCase());
 
   const abertos = escopo.filter((p) => p.status === 'pendente' && busca(p)).sort((a, b) => a.vencimento.localeCompare(b.vencimento));
