@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import { supabase } from './supabase';
 import { seed, FAIXAS_PADRAO, IDX_PRIMEIRA_PRETA, TAXAS_EXAME_2026, GRAD_MODALIDADES_PADRAO } from './seed';
-import { valorPlano, resumoPlano, temPlanos, modalidadesDoPlano } from './planos';
+import { valorPlano, resumoPlano, temPlanos, modalidadesDoPlano, temBolsa, valorPlanoBruto } from './planos';
 import { uid, todayISO, monthISO, addDays, addMonths, diffDays, brl, maskRG, maskCPF, maskTelefone } from './utils';
 
 // professores antes de filiais: ao tirar um professor de uma filial adicional, o cadastro dele é gravado primeiro
@@ -651,7 +651,19 @@ export function rotinaFinanceira() {
     if (minhas && !minhas.has(a.filialId) && a.email !== prof.email) continue;
     if (a.somenteAtleta && !a.plano) continue; // professor com ficha só de atleta: sem plano de treino, sem mensalidade
     const existe = draft.pagamentos.some((p) => p.pessoaId === a.id && p.tipo === 'mensalidade' && p.competencia === comp);
-    if (!existe && a.isento) {
+    // Bolsa no plano que zera a mensalidade (ex.: titular bolsista 100%): registro já quitado, como a isenção
+    const zeradaPorBolsa = !existe && !a.isento && a.plano && temBolsa(a.plano) && mensalidadeDoAluno(draft, a).valor === 0;
+    if (zeradaPorBolsa) {
+      const fil = draft.filiais.find((f) => f.id === a.filialId);
+      const agora = new Date().toISOString();
+      draft.pagamentos.push({
+        id: uid('pg'), tipo: 'mensalidade', pessoaId: a.id, filialId: a.filialId, competencia: comp,
+        descricao: `Mensalidade ${comp} — ${resumoPlano(fil, a.plano)}`, valor: 0, valorOriginal: valorPlanoBruto(fil, a.plano), vencimento: `${comp}-${diaDe(a)}`,
+        status: 'pago', pagoEm: agora, metodo: 'isencao', isencao: 'bolsa', confirmadoPor: 'Bolsa 100%',
+        criadoEm: agora, lembretes: [], auditoria: [{ em: agora, por: 'Sistema', acao: 'isencao', motivo: 'Bolsista 100%' }],
+      });
+      mudou = true;
+    } else if (!existe && a.isento) {
       // Bolsista / plano família: registro do mês já quitado, para o aluno também ter o histórico
       const fil = draft.filiais.find((f) => f.id === a.filialId);
       const agora = new Date().toISOString();

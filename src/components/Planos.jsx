@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDB, setDB, flush, departamentos, notify, mensalidadeDoAluno } from '../lib/db';
 import { supabase } from '../lib/supabase';
 import { brl, monthISO } from '../lib/utils';
-import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER, adicionalFamilia, extrasFamilia, resumoPlano, validarPlano, adicionalOutrasFiliais } from '../lib/planos';
+import { COMBOS, modalidadesOfertadas, temPlanos, pacoteAtivo, combosAtivos, somaModalidades, valorPlano, economiaPacote, rotuloValor, condicaoCombinada, condicaoAplica, BASE_QUALQUER, adicionalFamilia, extrasFamilia, resumoPlano, validarPlano, adicionalOutrasFiliais, BOLSAS, temBolsa, cotasPlano, descontoBolsas, valorPlanoBruto } from '../lib/planos';
 import { Card, Field, toast } from './ui';
 
 // ---------------------------------------------------------------------------
@@ -151,6 +151,20 @@ export function PlanosFilialEditor({ filial }) {
 // ---------------------------------------------------------------------------
 // Aluno (ou professor/Central pelo aluno): escolha do plano
 // ---------------------------------------------------------------------------
+/** Bolsa (desconto) por pessoa — só professor / Central */
+function SeletorBolsa({ value, onChange, cota }) {
+  const v = BOLSAS.includes(+value) ? +value : 0;
+  return (
+    <label className="row small" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span>🎓 Bolsa</span>
+      <select value={v} onChange={(e) => onChange(+e.target.value || undefined)} style={{ maxWidth: 170, padding: '4px 8px' }}>
+        {BOLSAS.map((b) => <option key={b} value={b}>{b ? `Bolsista ${b}%` : 'Sem bolsa'}</option>)}
+      </select>
+      {v > 0 && cota > 0 && <span className="xs muted">− {brl((cota * v) / 100)} (de {brl(cota)})</span>}
+    </label>
+  );
+}
+
 export function EscolhaPlano({ filial, value, onChange, equipe }) {
   const ofertadas = modalidadesOfertadas(filial);
   const cc = condicaoCombinada(filial);
@@ -182,6 +196,8 @@ export function EscolhaPlano({ filial, value, onChange, equipe }) {
     muda({ familia: { ...plano.familia, beneficiarios: benef.map((b, j) => (j === i ? { ...b, modalidades: mods } : b)) } });
   };
   const adicFam = adicionalFamilia(filial);
+  const cotas = cotasPlano(filial, plano);
+  const mudaBolsaBenef = (i, v) => muda({ familia: { ...plano.familia, beneficiarios: benef.map((x, j) => (j === i ? { ...x, bolsa: v } : x)) } });
   // Só professor / Central marcam "Treino em outra filial" (o aluno vê o valor, mas não marca)
   const adicOutras = equipe ? adicionalOutrasFiliais(filial) : 0;
   // "🏯 Outras filiais": valor fixo por pessoa (titular ou beneficiário) para treinar também em outras filiais
@@ -250,6 +266,7 @@ export function EscolhaPlano({ filial, value, onChange, equipe }) {
       )}
       {plano.tipo === 'pacote' && <div className="small">Inclui: <b>{ofertadas.map((m) => m.nome).join(', ')}</b></div>}
       {plano.tipo === 'pacote' && adicOutras > 0 && <div className="row">{chipOutras(!!plano.outrasFiliais, () => muda({ outrasFiliais: !plano.outrasFiliais }))}</div>}
+      {equipe && plano.tipo !== 'familia' && <SeletorBolsa value={plano.bolsa} cota={cotas[0]?.cota} onChange={(v) => muda({ bolsa: v })} />}
 
       {plano.tipo === 'familia' && (
         <div className="card" style={{ background: '#faf8f6' }}>
@@ -275,6 +292,12 @@ export function EscolhaPlano({ filial, value, onChange, equipe }) {
               <div style={{ marginTop: 6 }}>{chipsFamilia(plano.modalidades || [], alterna, chipOutras(!!plano.outrasFiliais, () => muda({ outrasFiliais: !plano.outrasFiliais })))}</div>
             </div>
           )}
+          {equipe && (
+            <div className="mb">
+              {plano.todas && <b className="small">Titular</b>}
+              <SeletorBolsa value={plano.bolsa} cota={cotas[0]?.cota} onChange={(v) => muda({ bolsa: v })} />
+            </div>
+          )}
           <b className="small">Beneficiários (você é o titular e responsável pelo pagamento)</b>
           <p className="xs muted" style={{ margin: '2px 0 8px' }}>Informe o nome e, se tiver, o e-mail Google de cada um. Quem já tem cadastro fica isento automaticamente; quem se cadastrar depois também.</p>
           {benef.map((b, i) => (
@@ -294,16 +317,22 @@ export function EscolhaPlano({ filial, value, onChange, equipe }) {
                   {chipsFamilia(b.modalidades || [], (nome) => alternaBenef(i, nome), chipOutras(!!b.outrasFiliais, () => muda({ familia: { ...plano.familia, beneficiarios: benef.map((x, j) => (j === i ? { ...x, outrasFiliais: !x.outrasFiliais } : x)) } })))}
                 </>
               )}
+              {equipe && <div style={{ marginTop: 6 }}><SeletorBolsa value={b.bolsa} cota={cotas[i + 1]?.cota} onChange={(v) => mudaBolsaBenef(i, v)} /></div>}
             </div>
           ))}
           {extrasFam > 0 && (
             <div className="small" style={{ marginTop: 4 }}>
-              Combo {plano.combo} pessoas {brl(+filial.planos.familia?.[plano.combo] || 0)} + {extrasFam} modalidade{extrasFam > 1 ? 's' : ''} adicional{extrasFam > 1 ? 'is' : ''} × {brl(adicFam)} = <b>{brl(valorPlano(filial, plano))}</b>
+              Combo {plano.combo} pessoas {brl(+filial.planos.familia?.[plano.combo] || 0)} + {extrasFam} modalidade{extrasFam > 1 ? 's' : ''} adicional{extrasFam > 1 ? 'is' : ''} × {brl(adicFam)} = <b>{brl(valorPlanoBruto(filial, plano))}</b>
             </div>
           )}
         </div>
       )}
 
+      {temBolsa(plano) && (
+        <div className="small">
+          🎓 Bolsas: {cotas.filter((c) => c.bolsa > 0).map((c) => `${plano.tipo === 'familia' ? (c.titular ? 'titular' : c.nome.split(' ')[0]) + ' ' : ''}${c.bolsa}% (− ${brl(c.desconto)})`).join(' · ')} — valor sem bolsa {brl(valorPlanoBruto(filial, plano))}, desconto <b>− {brl(descontoBolsas(filial, plano))}</b>
+        </div>
+      )}
       <div className="alert gold" style={{ justifyContent: 'space-between' }}>
         <span>Valor mensal do plano</span>
         <b style={{ fontSize: 20 }}>{rotuloValor(valorPlano(filial, plano))}</b>
@@ -317,7 +346,7 @@ export async function salvarPlanoAluno(alunoId, plano) {
   const limpo = {
     ...plano,
     modalidades: plano.tipo === 'pacote' ? [] : plano.modalidades || [],
-    familia: plano.tipo === 'familia' ? { beneficiarios: (plano.familia?.beneficiarios || []).map((b) => ({ nome: b.nome.trim(), email: (b.email || '').trim().toLowerCase(), ...(Array.isArray(b.modalidades) ? { modalidades: b.modalidades } : {}), ...(b.outrasFiliais ? { outrasFiliais: true } : {}) })) } : undefined,
+    familia: plano.tipo === 'familia' ? { beneficiarios: (plano.familia?.beneficiarios || []).map((b) => ({ nome: b.nome.trim(), email: (b.email || '').trim().toLowerCase(), ...(Array.isArray(b.modalidades) ? { modalidades: b.modalidades } : {}), ...(b.outrasFiliais ? { outrasFiliais: true } : {}), ...(+b.bolsa > 0 ? { bolsa: +b.bolsa } : {}) })) } : undefined,
     combo: plano.tipo === 'familia' ? plano.combo : undefined,
     todas: plano.tipo === 'familia' ? !!plano.todas : undefined,
     atualizadoEm: new Date().toISOString(),

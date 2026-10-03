@@ -85,10 +85,49 @@ export const adicionalOutrasFiliais = (f) => (f?.planos?.outrasFiliais?.ativo &&
 export const pessoasOutrasFiliais = (plano) =>
   !plano ? 0 : (plano.outrasFiliais ? 1 : 0) + (plano.tipo === 'familia' ? (plano.familia?.beneficiarios || []).filter((b) => b.outrasFiliais).length : 0);
 
-/** Valor mensal do plano do aluno. Sem planos configurados na filial, vale a mensalidade base. */
-export function valorPlano(f, plano) {
+/** Bolsa (desconto) definida pelo professor ou pela Central, por pessoa: plano.bolsa (titular) e beneficiario.bolsa */
+export const BOLSAS = [0, 25, 50, 75, 100];
+const pct = (v) => (BOLSAS.includes(+v) ? +v : 0);
+export const temBolsa = (plano) => !!plano && (pct(plano.bolsa) > 0 || (plano.tipo === 'familia' && (plano.familia?.beneficiarios || []).some((b) => pct(b.bolsa) > 0)));
+
+/** Valor do plano antes das bolsas */
+export function valorPlanoBruto(f, plano) {
   const v = valorPlanoBase(f, plano);
   return temPlanos(f) && plano ? v + pessoasOutrasFiliais(plano) * adicionalOutrasFiliais(f) : v;
+}
+
+/**
+ * Cota de cada pessoa no plano (para aplicar a bolsa individualmente):
+ * família = combo ÷ nº de pessoas + modalidades a mais dela + treino em outra filial dela; demais planos = valor inteiro.
+ * Retorna [{ nome, titular, bolsa, cota, desconto }]
+ */
+export function cotasPlano(f, plano) {
+  if (!plano) return [];
+  if (!temPlanos(f) || plano.tipo !== 'familia') {
+    const cota = valorPlanoBruto(f, plano);
+    const b = pct(plano.bolsa);
+    return [{ nome: 'Titular', titular: true, bolsa: b, cota, desconto: (cota * b) / 100 }];
+  }
+  const combo = +f.planos.familia?.[plano.combo] || 0;
+  const n = plano.combo || 1;
+  const adicFam = adicionalFamilia(f);
+  const adicOutras = adicionalOutrasFiliais(f);
+  const pessoas = pessoasFamilia(f, plano);
+  const marcas = [plano, ...(plano.familia?.beneficiarios || [])];
+  return pessoas.map((p, i) => {
+    const extras = plano.todas ? 0 : Math.max(0, (p.modalidades?.length || 0) - 1) * adicFam;
+    const cota = combo / n + extras + (marcas[i]?.outrasFiliais ? adicOutras : 0);
+    const b = pct(marcas[i]?.bolsa);
+    return { nome: p.nome, titular: !!p.titular, bolsa: b, cota, desconto: (cota * b) / 100 };
+  });
+}
+export const descontoBolsas = (f, plano) => Math.round(cotasPlano(f, plano).reduce((s, c) => s + c.desconto, 0) * 100) / 100;
+
+/** Valor mensal do plano do aluno (já com as bolsas). Sem planos configurados na filial, vale a mensalidade base. */
+export function valorPlano(f, plano) {
+  const bruto = valorPlanoBruto(f, plano);
+  if (!plano || !temBolsa(plano)) return bruto;
+  return Math.max(0, Math.round((bruto - descontoBolsas(f, plano)) * 100) / 100);
 }
 function valorPlanoBase(f, plano) {
   const base = +f?.mensalidade || 0;
@@ -106,6 +145,12 @@ export const modalidadesDoPlano = (f, plano) =>
 
 /** Texto curto: "Sanda + Tai Chi Chuan", "Pacote completo", "Família (3 pessoas) · Sanda" */
 export function resumoPlano(f, plano) {
+  const r = resumoPlanoSemBolsa(f, plano);
+  if (!plano || !temBolsa(plano)) return r;
+  const bs = cotasPlano(f, plano).filter((c) => c.bolsa > 0);
+  return r + ' · ' + bs.map((c) => `bolsa ${c.bolsa}%${plano.tipo === 'familia' ? ` (${c.titular ? 'titular' : c.nome.split(' ')[0]})` : ''}`).join(', ');
+}
+function resumoPlanoSemBolsa(f, plano) {
   if (!temPlanos(f) || !plano) return 'Mensalidade';
   if (plano.tipo === 'pacote') return 'Pacote completo' + (plano.outrasFiliais && adicionalOutrasFiliais(f) ? ' + outras filiais' : '');
   const mods = modalidadesDoPlano(f, plano);
