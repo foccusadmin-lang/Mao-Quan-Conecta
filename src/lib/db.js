@@ -583,8 +583,24 @@ export const filialTemGeral = (db, filialId) => responsaveisFilial(db.filiais.fi
  * Aluno sem modalidade registrada fica com o professor "Geral" da filial; se a filial não tiver "Geral", aparece para todos
  * (ninguém some da chamada por falta de cadastro).
  */
+/** Ficha de praticante de quem também é professor (mesmo e-mail, promovido ou matriculado como praticante) */
+export const ehProfessorPraticante = (db, a) =>
+  !!a && (!!a.praticanteProfessor || !!a.promovidoProfessor || (db.professores || []).some((p) => p.ativo !== false && (p.email || '').toLowerCase() === (a.email || '').toLowerCase()));
+const ehShifu = (p) => /^shifu$/i.test((p?.titulo || '').trim());
+/** Quem faz a chamada dos professores graduados: o Shifu da filial (sem Shifu na equipe, o professor "Geral") */
+function chamadaDosProfessores(db, user) {
+  if (ehShifu(user)) return true;
+  const temShifu = responsaveisFilial(db.filiais.find((x) => x.id === user.filialId)).some((r) => ehShifu(db.professores.find((p) => p.id === r.professorId)));
+  return !temShifu && ehResponsavelGeral(modalidadesProfessor(db, user));
+}
+
 export function professorVeAluno(db, user, a) {
   if (!a || user?.role !== 'professor') return true;
+  // O próprio professor nunca aparece na chamada dele
+  if ((a.email || '').toLowerCase() && (a.email || '').toLowerCase() === (user.email || '').toLowerCase()) return false;
+  // Professor com graduação de professor (faixa preta em diante) só treina com o Shifu: aparece só na chamada dele.
+  // Professor que ainda tem graduação de estudante segue a regra das modalidades, como os demais alunos.
+  if (ehProfessorPraticante(db, a) && (+a.faixaIdx || 0) >= IDX_PRIMEIRA_PRETA) return chamadaDosProfessores(db, user);
   const pm = modalidadesProfessor(db, user);
   if (!pm.length || ehResponsavelGeral(pm)) return true;
   const am = modalidadesAluno(db, a);
