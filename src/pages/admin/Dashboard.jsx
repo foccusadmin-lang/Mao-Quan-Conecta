@@ -4,6 +4,7 @@ import { brl, fmtDate, todayISO, monthISO } from '../../lib/utils';
 import { PageHead, Stat, Card, Empty, Avatar } from '../../components/ui';
 import { BotaoLinkInvestidor } from '../../components/LinkInvestidor';
 import { SponsorShare } from '../../components/shared';
+import { AulasDoDia } from '../../components/Turnos';
 
 export default function AdminDashboard() {
   const db = useDB();
@@ -42,6 +43,8 @@ export default function AdminDashboard() {
         <Stat label="Inadimplentes" value={inadimplentes.length} icon="⛔" tone="red" />
         <Stat label="Aptos p/ exame" value={aprovados.filter((a) => a.preExame?.status === 'apto').length} icon="🎖️" tone="ink" />
       </div>
+
+      <div className="mt"><AulasDoDia /></div>
 
       <div className="grid g2 mt">
         <Card title="⚠️ Avisos">

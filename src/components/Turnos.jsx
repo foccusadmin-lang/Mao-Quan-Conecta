@@ -88,7 +88,13 @@ export const textoTurnos = (turnos) => (turnos?.length ? turnos.map(nomeTurno).j
 export function HorariosFilialEditor({ filial }) {
   const [lista, setLista] = useState(() => structuredClone(filial.horarios || []));
   useEffect(() => setLista(structuredClone(filial.horarios || [])), [filial.id]);
-  const [novo, setNovo] = useState({ inicio: '', fim: '', dias: [] });
+  const [novo, setNovo] = useState({ inicio: '', fim: '', dias: [], aula: '' });
+  // Renomear a aula de um horário já cadastrado
+  const renomear = (h) => {
+    const nome = window.prompt('Nome da aula (ex.: Treino de força, Treino tradicional). Deixe vazio para tirar.', h.aula || '');
+    if (nome === null) return;
+    setLista(lista.map((x) => (x.id === h.id ? (nome.trim() ? { ...x, aula: nome.trim() } : (({ aula, ...r }) => r)(x)) : x)));
+  };
   const cruzaDias = (a, b) => !a.length || !b.length || a.some((d) => b.includes(d));
 
   const adicionar = () => {
@@ -96,8 +102,8 @@ export function HorariosFilialEditor({ filial }) {
     if (novo.fim <= novo.inicio) return toast('O fim precisa ser depois do início.');
     if (lista.some((h) => cruzaDias(novo.dias, h.dias || []) && novo.inicio < h.fim && h.inicio < novo.fim)) return toast('Esse horário se sobrepõe a outro já cadastrado no mesmo dia.');
     const dias = novo.dias.length === 7 ? [] : DIAS_SEMANA.map(([d]) => d).filter((d) => novo.dias.includes(d));
-    setLista([...lista, { id: uid('hr'), turno: turnoDoHorario(novo.inicio), inicio: novo.inicio, fim: novo.fim, ...(dias.length ? { dias } : {}) }].sort((a, b) => a.inicio.localeCompare(b.inicio)));
-    setNovo({ ...novo, inicio: '', fim: '' }); // mantém os dias marcados para cadastrar o próximo horário do mesmo dia
+    setLista([...lista, { id: uid('hr'), turno: turnoDoHorario(novo.inicio), inicio: novo.inicio, fim: novo.fim, ...(dias.length ? { dias } : {}), ...(novo.aula.trim() ? { aula: novo.aula.trim() } : {}) }].sort((a, b) => a.inicio.localeCompare(b.inicio)));
+    setNovo({ ...novo, inicio: '', fim: '', aula: '' }); // mantém os dias marcados para cadastrar o próximo horário do mesmo dia
   };
   const salvar = () => {
     setDB((d) => {
@@ -122,6 +128,7 @@ export function HorariosFilialEditor({ filial }) {
             {hs.map((h) => (
               <span key={h.id} className="badge" style={{ padding: '4px 8px' }}>
                 <b>{textoDias(h)}</b> {rotuloHorario(h)}{' '}
+                <button type="button" className="btn link sm" title="Nome da aula" onClick={() => renomear(h)}>✏️</button>
                 <button type="button" className="btn link sm" title="Remover horário" onClick={() => setLista(lista.filter((x) => x.id !== h.id))}>✕</button>
               </span>
             ))}
@@ -143,10 +150,43 @@ export function HorariosFilialEditor({ filial }) {
       <div className="row mt" style={{ gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <label className="small">Início<br /><input type="time" value={novo.inicio} onChange={(e) => setNovo({ ...novo, inicio: e.target.value })} /></label>
         <label className="small">Fim<br /><input type="time" value={novo.fim} onChange={(e) => setNovo({ ...novo, fim: e.target.value })} /></label>
+        <label className="small grow" style={{ minWidth: 180 }}>Aula (opcional)<br /><input value={novo.aula} onChange={(e) => setNovo({ ...novo, aula: e.target.value })} placeholder="Ex.: Treino de força" /></label>
         <button type="button" className="btn ghost" onClick={adicionar}>+ Adicionar horário</button>
       </div>
       <div className="xs muted mt">O período (manhã, tarde ou noite) é definido pelo horário de início: antes das 12h, até as 18h, ou depois.</div>
       <div className="row end mt"><button type="button" className="btn" onClick={salvar}>Salvar horários</button></div>
+    </Card>
+  );
+}
+
+/** Aulas do dia (grade de horários) — painel do professor (filial ativa) e da Central (todas as filiais) */
+export function AulasDoDia({ filialIds }) {
+  const db = useDB();
+  const hoje = new Date().getDay();
+  const agora = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+  const filiais = db.filiais.filter((f) => (!filialIds || filialIds.includes(f.id)) && (f.horarios || []).length);
+  const blocos = filiais.map((f) => ({ f, hs: horariosFilial(f, null, hoje) })).filter((b) => b.hs.length);
+  const nomeDia = DIAS_SEMANA.find(([d]) => d === hoje)?.[1];
+  return (
+    <Card title={`🕐 Aulas de hoje (${nomeDia})`}>
+      {!filiais.length && <p className="small muted" style={{ margin: 0 }}>Nenhuma grade de horários cadastrada. Cadastre em Presença → “🕐 Horários de aula”.</p>}
+      {filiais.length > 0 && !blocos.length && <p className="small muted" style={{ margin: 0 }}>Sem aulas cadastradas para hoje.</p>}
+      {blocos.map(({ f, hs }) => (
+        <div key={f.id} className="mb">
+          {(!filialIds || filialIds.length > 1) && <div className="xs muted" style={{ fontWeight: 600, marginBottom: 2 }}>{f.nome}</div>}
+          {hs.map((h) => {
+            const status = agora >= h.fim ? 'encerrada' : agora >= h.inicio ? 'agora' : '';
+            return (
+              <div key={h.id} className="list-item" style={{ padding: '6px 0', opacity: status === 'encerrada' ? 0.55 : 1 }}>
+                <b className="small" style={{ minWidth: 96 }}>{h.inicio}–{h.fim}</b>
+                <span className="small grow">{h.aula || <span className="muted">Aula ({nomeTurno(h.turno).toLowerCase()})</span>}</span>
+                {status === 'agora' && <span className="badge ok">acontecendo agora</span>}
+                {status === 'encerrada' && <span className="xs muted">encerrada</span>}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </Card>
   );
 }

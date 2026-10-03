@@ -152,7 +152,8 @@ export const diaDaData = (iso) => new Date(iso + 'T12:00').getDay();
 export const horarioNoDia = (h, dia) => dia === undefined || dia === null || !h.dias?.length || h.dias.includes(dia);
 export const textoDias = (h) => (!h?.dias?.length || h.dias.length === 7 ? 'Todos os dias' : DIAS_SEMANA.filter(([d]) => h.dias.includes(d)).map(([, n]) => n).join('/'));
 export const horariosFilial = (f, turno, dia) => (f?.horarios || []).filter((h) => (!turno || h.turno === turno) && horarioNoDia(h, dia)).sort((a, b) => a.inicio.localeCompare(b.inicio));
-export const rotuloHorario = (h, comDias) => (h ? `${comDias && h.dias?.length && h.dias.length < 7 ? textoDias(h) + ' ' : ''}${h.inicio}–${h.fim}` : '');
+/** "Ter/Qui 16:00–17:00 · Treino de força" (horario.aula = nome da aula, opcional) */
+export const rotuloHorario = (h, comDias) => (h ? `${comDias && h.dias?.length && h.dias.length < 7 ? textoDias(h) + ' ' : ''}${h.inicio}–${h.fim}${h.aula ? ` · ${h.aula}` : ''}` : '');
 /** Aluno está na chamada deste horário? Quem treina no período mas ainda não escolheu o horário aparece em todos os horários dele */
 export function alunoNoHorario(a, h, filial) {
   if (!h) return true;

@@ -5,6 +5,7 @@ import { PageHead, Stat, Card, Empty, Faixa, Avatar } from '../../components/ui'
 import { SponsorShare, InvestButton } from '../../components/shared';
 import { MinhaChavePix } from '../../components/ChavePix';
 import { BotaoLinkInvestidor } from '../../components/LinkInvestidor';
+import { AulasDoDia } from '../../components/Turnos';
 
 export default function ProfDashboard({ user }) {
   const db = useDB();
@@ -58,6 +59,8 @@ export default function ProfDashboard({ user }) {
         <Stat label="Recebido no mês" value={brl(recebido)} icon="💰" tone="ok" />
         <Stat label="Em aberto" value={brl(aberto)} icon="🧾" tone="gold" />
       </div>
+
+      <div className="mt"><AulasDoDia filialIds={[filial.id]} /></div>
 
       <div className="grid g2 mt">
         <Card title="⚠️ Frequência abaixo do mínimo" actions={<Link to="presenca" className="btn sm ghost">Chamada</Link>}>
