@@ -32,6 +32,8 @@ import PainelInvestidor from './pages/PainelInvestidor';
 import ProfDashboard from './pages/professor/Dashboard';
 import Presenca from './pages/professor/Presenca';
 import ChamadaAdmin from './pages/admin/Chamada';
+import Monitoramento from './pages/aluno/Monitoramento';
+import MonitoramentoEquipe from './pages/shared/MonitoramentoEquipe';
 import Estudo from './pages/professor/Estudo';
 import Filiacao from './pages/professor/Filiacao';
 import ProfCarteira from './pages/professor/Carteira';
@@ -115,6 +117,7 @@ export default function App() {
             <Route path="documentos" element={<DocumentosAtletas user={user} />} />
             <Route path="alunos" element={<Alunos user={user} />} />
             <Route path="chamada" element={<ChamadaAdmin user={user} />} />
+            <Route path="monitoramento" element={<MonitoramentoEquipe user={user} />} />
             <Route path="graduacao" element={<Graduacao user={user} />} />
             <Route path="financeiro" element={<Financeiro user={user} />} />
             <Route path="carteirinhas" element={<Carteirinhas />} />
@@ -133,6 +136,8 @@ export default function App() {
             <Route index element={<ProfDashboard user={user} />} />
             {temRecurso(user, 'alunos') && <Route path="alunos" element={<Alunos user={user} />} />}
             {temRecurso(user, 'presenca') && <Route path="presenca" element={<Presenca user={user} />} />}
+            <Route path="monitoramento" element={<MonitoramentoEquipe user={user} />} />
+            <Route path="meu-monitoramento" element={<ComoPraticante user={user}>{(pr) => <Monitoramento user={pr} />}</ComoPraticante>} />
             {temRecurso(user, 'graduacao') && <Route path="graduacao" element={<Graduacao user={user} />} />}
             {temRecurso(user, 'financeiro') && <Route path="financeiro" element={<Financeiro user={user} />} />}
             {temRecurso(user, 'materiais') && <Route path="materiais" element={<Materiais user={user} />} />}
@@ -160,6 +165,7 @@ export default function App() {
               <Route path="presenca" element={<AlunoPresenca user={user} />} />
               <Route path="eventos" element={<Eventos user={user} />} />
               <Route path="atleta" element={<Atleta user={user} />} />
+              <Route path="monitoramento" element={<Monitoramento user={user} />} />
               <Route path="carreira" element={<Carreira user={user} />} />
               <Route path="onde-treinar" element={<OndeTreinar user={user} />} />
               <Route path="institucional" element={<><PageHead title="Institucional" sub="Linhagem, história e o código de ética Wu De" /><Institucional /></>} />

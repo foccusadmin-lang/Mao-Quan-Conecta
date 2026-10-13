@@ -13,6 +13,7 @@ export const NAVS = {
     ['professores', '👨‍🏫', 'Professores'],
     ['alunos', '🥋', 'Alunos & Prontuários'],
     ['chamada', '✅', 'Chamada'],
+    ['monitoramento', '📈', 'Monitoramento de Performance'],
     ['graduacao', '🎖️', 'Graduação & Pré-Exame'],
     ['financeiro', '💳', 'Financeiro'],
     ['carteirinhas', '🪪', 'Carteirinhas'],
@@ -30,6 +31,7 @@ export const NAVS = {
     ['', '📊', 'Minha Unidade'],
     ['alunos', '🥋', 'Alunos da Filial'],
     ['presenca', '✅', 'Presença & Chamada'],
+    ['monitoramento', '📈', 'Monitoramento do Atleta'],
     ['graduacao', '🎖️', 'Pré-Exame'],
     ['financeiro', '💳', 'Mensalidades'],
     ['materiais', '🎬', 'Material Didático'],
@@ -43,6 +45,7 @@ export const NAVS = {
     ['filiacao', '🏅', 'Filiação'],
     ['plano', '📋', 'Meu Plano'],
     ['atleta', '🏆', 'Atleta'],
+    ['meu-monitoramento', '📝', 'Meu Monitoramento'],
     ['dados', '📝', 'Meus Dados'],
   ],
   aluno: [
@@ -54,6 +57,7 @@ export const NAVS = {
     ['eventos', '📅', 'Eventos'],
     ['onde-treinar', '📍', 'Onde Treinar'],
     ['atleta', '🏆', 'Atleta'],
+    ['monitoramento', '📈', 'Monitoramento de Performance'],
     ['institucional', '📜', 'Institucional'],
     ['diretoria', '🏛️', 'Diretoria'],
     ['plano', '📋', 'Meu Plano'],
@@ -72,7 +76,9 @@ export default function Layout({ user }) {
   const base = '/' + user.role;
   // Professor também pode ser atleta: vale a ficha de praticante (mesmo e-mail)
   const praticante = user.role === 'professor' ? db.alunos.find((a) => (a.email || '').toLowerCase() === (user.email || '').toLowerCase()) : user;
-  const nav = NAVS[user.role].filter(([p]) => !(p === 'atleta' && user.role === 'aluno' && !praticante?.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
+  // Monitoramento: o formulário só aparece para atletas (aluno ou professor que também é atleta)
+  const soAtleta = (p) => (user.role === 'aluno' && (p === 'atleta' || p === 'monitoramento')) || (user.role === 'professor' && p === 'meu-monitoramento');
+  const nav = NAVS[user.role].filter(([p]) => !(soAtleta(p) && !praticante?.atleta?.ativo) && (user.role !== 'professor' || !p || temRecurso(user, p)));
   const EXTRAS = { carreira: 'Construir Carreira' };
   const extra = EXTRAS[loc.pathname.split('/')[2]];
   const current = nav.find(([p]) => loc.pathname === (p ? `${base}/${p}` : base)) || (extra ? ['', '', extra] : nav[0]);
