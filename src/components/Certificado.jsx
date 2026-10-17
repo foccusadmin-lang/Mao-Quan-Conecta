@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { toPng, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { imprimirImagens } from '../lib/imprimir';
 import { maskCPF, maskRG } from '../lib/utils';
 import { toast } from './ui';
 
@@ -108,11 +109,7 @@ export function CertificadoComAcoes({ c, liberado = true, motivo }) {
         pdf.addImage(await gerarImagem(ref.current, true), 'JPEG', 0, 0, 297, 210);
         pdf.save(`${nome}.pdf`);
       } else if (formato === 'print') {
-        const url = await gerarImagem(ref.current, true);
-        const w = window.open('', '_blank');
-        if (!w) return toast('Permita pop-ups para imprimir.');
-        w.document.write(`<html><head><title>Certificado</title><style>@page{size:A4 landscape;margin:0}body{margin:0}img{width:297mm;height:210mm}</style></head><body><img src="${url}"/><script>window.onload=()=>setTimeout(()=>window.print(),250)</script></body></html>`);
-        w.document.close();
+        await imprimirImagens([await gerarImagem(ref.current, true)], { orientacao: 'landscape', titulo: nome });
       } else {
         const a = document.createElement('a');
         a.href = await gerarImagem(ref.current, formato === 'jpg');

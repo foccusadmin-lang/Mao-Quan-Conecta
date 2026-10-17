@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react';
 import { toPng, toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
+import { imprimirHTML } from '../lib/imprimir';
 import { faixaNome, faixaNivel, filialNome } from '../lib/db';
 import { fmtDate, b64e, APP_URL, maskRG, maskCPF } from '../lib/utils';
 import { toast } from './ui';
@@ -179,15 +180,12 @@ export async function exportarCarteirinha(nodes, formato, nome = 'carteirinha') 
     }
     pdf.save(`${safe}.pdf`);
   } else if (formato === 'print') {
-    const w = window.open('', '_blank');
-    if (!w) return toast('Permita pop-ups para imprimir.');
     const imgs = [await renderizar(frente), verso && (await renderizar(verso))].filter(Boolean);
-    w.document.write(
-      `<html><head><title>${nome}</title><style>@page{size:A4;margin:12mm}body{margin:0;font-family:sans-serif}img{width:${PDF_MM[0]}mm;height:${PDF_MM[1]}mm;margin:0 6mm 6mm 0;border:0.2mm dashed #bbb}</style></head><body>` +
-        imgs.map((u) => `<img src="${u}"/>`).join('') +
-        `<script>window.onload=()=>setTimeout(()=>window.print(),250)</script></body></html>`
+    await imprimirHTML(
+      imgs.map((u) => `<img src="${u}"/>`).join(''),
+      `@page{size:A4;margin:12mm}body{font-family:sans-serif}img{width:${PDF_MM[0]}mm;height:${PDF_MM[1]}mm;margin:0 6mm 6mm 0;border:0.2mm dashed #bbb}`,
+      nome,
     );
-    w.document.close();
   }
 }
 

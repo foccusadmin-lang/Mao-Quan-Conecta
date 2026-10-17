@@ -6,6 +6,7 @@ import { jsPDF } from 'jspdf';
 import { useDB, setDB, modalidadesAluno, DIAS_SEMANA } from '../lib/db';
 import { maskCPF, maskRG } from '../lib/utils';
 import { Card, Field, toast } from './ui';
+import { imprimirImagens } from '../lib/imprimir';
 
 const DIAS = { 1: 'Segunda-feira', 2: 'Terça-feira', 3: 'Quarta-feira', 4: 'Quinta-feira', 5: 'Sexta-feira', 6: 'Sábado', 0: 'Domingo' };
 const ORDEM = [1, 2, 3, 4, 5, 6, 0];
@@ -156,10 +157,7 @@ function entregar(imagens, formato, arquivo) {
     pdf.save(`${arquivo}.pdf`);
     return;
   }
-  const w = window.open('', '_blank');
-  if (!w) return toast('Permita pop-ups para imprimir.');
-  w.document.write(`<html><head><title>Declaração</title><style>@page{size:A4 portrait;margin:0}body{margin:0}img{width:210mm;height:297mm;display:block;page-break-after:always}</style></head><body>${imagens.map((i) => `<img src="${i}"/>`).join('')}<script>window.onload=()=>setTimeout(()=>window.print(),400)</script></body></html>`);
-  w.document.close();
+  return imprimirImagens(imagens, { orientacao: 'portrait', titulo: arquivo });
 }
 
 /**
@@ -187,7 +185,7 @@ export async function declaracoesEmLote(db, alunos, formato, aoProgresso) {
     root.unmount();
     caixa.remove();
   }
-  entregar(imagens, formato, alunos.length === 1 ? `declaracao-${alunos[0].nome}`.replace(/[^\w-]+/g, '_') : `declaracoes-${alunos.length}-alunos`);
+  await entregar(imagens, formato, alunos.length === 1 ? `declaracao-${alunos[0].nome}`.replace(/[^\w-]+/g, '_') : `declaracoes-${alunos.length}-alunos`);
 }
 
 /** Campos da declaração que fazem sentido aplicar a vários alunos de uma vez (os dados pessoais ficam de cada um) */
@@ -205,7 +203,7 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
   const exportar = async (formato) => {
     setBusy(true);
     try {
-      entregar([await gerarImagem(ref.current)], formato, arquivo);
+      await entregar([await gerarImagem(ref.current)], formato, arquivo);
     } catch (e) {
       toast('Falha ao gerar: ' + e.message);
     } finally {

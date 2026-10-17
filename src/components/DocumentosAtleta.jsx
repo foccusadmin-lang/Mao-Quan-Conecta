@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { abrirLinkDepois } from '../lib/imprimir';
 import { useDB } from '../lib/db';
 import { fmtDate } from '../lib/utils';
 import { TIPOS_DOC, ENTIDADES, enviarDocumento, removerDocumento, urlDocumento, progressoDocumentos } from '../lib/documentos';
@@ -17,8 +18,7 @@ function Enviar({ rotulo, onArquivo, disabled, className = 'btn sm' }) {
 
 async function abrir(doc, baixar) {
   try {
-    const url = await urlDocumento(doc.caminho, baixar);
-    window.open(url, '_blank', 'noopener');
+    await abrirLinkDepois(() => urlDocumento(doc.caminho, baixar));
   } catch (e) {
     toast('Não foi possível abrir: ' + e.message);
   }
