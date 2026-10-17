@@ -38,20 +38,49 @@ export function dadosDeclaracao(db, a) {
   };
 }
 
-/** A folha A4 (unidades cqw: tudo escala com a largura) */
+/**
+ * Horários agrupados por dia da semana (uma linha por dia) e intervalos seguidos unidos:
+ * Terça 16:00–17:00 + 17:00–18:00 + 19:00–20:30 → "16:00 às 18:00 e 19:00 às 20:30"
+ */
+export function horariosPorDia(horarios = []) {
+  const porDia = new Map();
+  for (const h of horarios) {
+    if (!h.inicio && !h.fim) continue;
+    if (!porDia.has(h.dia)) porDia.set(h.dia, []);
+    porDia.get(h.dia).push([h.inicio || '', h.fim || '']);
+  }
+  return ORDEM.filter((dia) => porDia.has(dia)).map((dia) => {
+    const faixas = porDia.get(dia).sort((a, b) => a[0].localeCompare(b[0]));
+    const unidas = [];
+    for (const [a, b] of faixas) {
+      const ult = unidas.at(-1);
+      if (ult && a && ult[1] && a <= ult[1]) ult[1] = b > ult[1] ? b : ult[1];
+      else unidas.push([a, b]);
+    }
+    return { dia, faixas: unidas };
+  });
+}
+
+/** A folha A4 (unidades cqw: tudo escala com a largura). Data e assinatura vêm depois do texto: nunca ficam por baixo dele */
 export function DeclaracaoVisual({ d, innerRef }) {
   const fem = d.genero === 'f';
   const masc = d.genero === 'm';
   const art = fem ? 'a' : masc ? 'o' : 'o(a)';
   const port = fem ? 'portadora' : masc ? 'portador' : 'portador(a)';
-  const linhas = d.horarios?.length ? d.horarios : [1, 2, 4, 5, 6].map((dia) => ({ dia, inicio: '', fim: '' }));
+  const dias = horariosPorDia(d.horarios);
+  const emBranco = !dias.length; // sem horários: linhas para preencher à mão, como no modelo
+  const linhas = emBranco ? [1, 2, 4, 5, 6].map((dia) => ({ dia, faixas: [['', '']] })) : dias;
+  // Muitos dias / horários longos: aproxima as linhas para caber na página
+  const longas = linhas.filter((l) => l.faixas.length > 2).length;
+  const passo = linhas.length + longas > 6 ? 7 : 12;
   const t = (pt) => `${(pt / 595.32) * 100}cqw`; // tamanho em pontos do PDF original
   const b = { fontWeight: 700 };
+  const vazio = (w) => <span style={{ display: 'inline-block', minWidth: t(w), borderBottom: `${t(0.7)} solid #111` }}>{'\u00a0'}</span>;
   return (
     <div style={{ containerType: 'inline-size', width: '100%' }}>
       <div ref={innerRef} style={{ position: 'relative', width: '100%', aspectRatio: '210 / 297', background: '#fff', color: '#111', fontFamily: 'Calibri, Carlito, "Segoe UI", Arial, sans-serif', overflow: 'hidden' }}>
         <img src="./declaracao/marca-dagua.jpg" alt="" style={{ position: 'absolute', left: '16.5%', top: '29.5%', width: '67%' }} />
-        <div style={{ position: 'absolute', inset: 0, padding: `${t(46)} ${t(76)} 0 ${t(85)}` }}>
+        <div style={{ position: 'absolute', inset: 0, padding: `${t(46)} ${t(76)} ${t(26)} ${t(85)}`, display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ color: '#e10600', fontWeight: 900, fontSize: t(22), letterSpacing: '.01em', fontFamily: 'Impact, "Arial Narrow", "Segoe UI", sans-serif' }}>ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU</div>
@@ -61,39 +90,50 @@ export function DeclaracaoVisual({ d, innerRef }) {
             <img src="./declaracao/logo.jpg" alt="" style={{ width: t(86), marginTop: t(-6) }} />
           </div>
 
-          <p style={{ fontSize: t(12), lineHeight: 1.45, textAlign: 'justify', marginTop: t(26) }}>
+          <p style={{ fontSize: t(12), lineHeight: 1.45, textAlign: 'justify', margin: `${t(26)} 0 0` }}>
             A entidade <span style={b}>Associação Mao Quan Kung-fu Wushu</span>, inscrita no CNPJ sob o nº <span style={b}>69.451.196/0001-37</span>, com sede na Rua Dinamarca, 30, Vila Engenho Novo, CEP 06416-100, Barueri/SP, vem por meio desta <span style={b}>DECLARAR</span> que {art} atleta{' '}
             <span style={b}>{d.nome || '________________'}</span>, {port} do RG nº <span style={b}>{d.rg ? maskRG(d.rg) : '____________'}</span> e do CPF nº{' '}
             <span style={b}>{d.cpf ? maskCPF(d.cpf) : '______________'}</span>, praticante da modalidade <span style={b}>{d.modalidade || '__________'}</span>, faz parte do nosso quadro de atletas e treina regularmente nos seguintes dias e horários:
           </p>
 
-          <ul style={{ fontSize: t(12), fontWeight: 700, margin: `${t(22)} 0 0`, paddingLeft: t(36), lineHeight: 1 }}>
-            {linhas.map((l, i) => (
-              <li key={i} style={{ margin: `0 0 ${t(12)}` }}>
-                <span style={{ display: 'inline-block', width: t(106) }}>{DIAS[l.dia]} das</span>
-                <span style={{ display: 'inline-block', minWidth: t(64), textAlign: 'center', borderBottom: l.inicio ? 0 : `${t(0.7)} solid #111` }}>{l.inicio || ' '}</span>
-                <span style={{ margin: `0 ${t(10)}` }}>às</span>
-                <span style={{ display: 'inline-block', minWidth: t(64), textAlign: 'center', borderBottom: l.fim ? 0 : `${t(0.7)} solid #111` }}>{l.fim || ' '}</span>
-                <span style={{ marginLeft: t(10) }}>Horas</span>
+          <ul style={{ listStyle: 'none', fontSize: t(12), fontWeight: 700, margin: `${t(passo === 12 ? 22 : 14)} 0 0`, paddingLeft: t(36), lineHeight: 1.3 }}>
+            {linhas.map((l) => (
+              <li key={l.dia} style={{ margin: `0 0 ${t(passo)}`, display: 'flex', gap: t(6) }}>
+                <span style={{ flex: 'none', width: t(12), marginLeft: t(-18) }}>•</span>
+                <span style={{ flex: 'none', width: t(100) }}>{DIAS[l.dia]} das</span>
+                <span>
+                  {l.faixas.map(([a, z], i) => (
+                    <span key={i} style={{ whiteSpace: 'nowrap' }}>
+                      {i > 0 && (i === l.faixas.length - 1 ? ' e ' : ', ')}
+                      {a || vazio(60)} às {z || vazio(60)}
+                    </span>
+                  ))}{' '}
+                  Horas
+                </span>
               </li>
             ))}
           </ul>
 
-          <p style={{ fontSize: t(12), fontWeight: 700, lineHeight: 1.4, textAlign: 'justify', textIndent: t(36), marginTop: t(26) }}>
+          <p style={{ fontSize: t(12), fontWeight: 700, lineHeight: 1.4, textAlign: 'justify', textIndent: t(36), margin: `${t(passo === 12 ? 26 : 14)} 0 0` }}>
             DECLARAMOS AINDA QUE {fem ? 'A' : masc ? 'O' : 'O(A)'} ATLETA NÃO RECEBE, POR PARTE DESTA ENTIDADE, NENHUM TIPO DE BOLSA OU QUALQUER OUTRA FORMA REGULAR DE PAGAMENTO EM VALOR PECUNIÁRIO.
           </p>
-        </div>
 
-        <div style={{ position: 'absolute', right: t(88), top: `${((841.92 - 259) / 841.92) * 100 - 1.2}%`, fontSize: t(12) }}>Barueri, {dataPorExtenso()}.</div>
-        <div style={{ position: 'absolute', left: 0, right: 0, top: `${((841.92 - 162) / 841.92) * 100}%`, textAlign: 'center', fontSize: t(12), lineHeight: 1.3 }}>
-          <div style={{ borderTop: `${t(0.8)} solid #111`, width: t(226), margin: `0 auto ${t(8)}` }} />
-          Francisco Crizante
-          <div style={{ fontStyle: 'italic' }}>Técnico e Gestor</div>
-        </div>
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: t(26), textAlign: 'center', color: '#e10600', fontSize: t(12), lineHeight: 1.3 }}>
-          <b>– ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU –</b>
-          <br />CNPJ 69.451.196/0001-37
-          <br />Rua Dinamarca, 30 - Vila Engenho Novo - Barueri/SP - CEP 06416-100
+          {/* Espaço flexível: com pouco texto a data fica na posição do modelo; com muito, ela desce junto sem sobrepor */}
+          <div style={{ flex: '1 1 auto', minHeight: t(18), maxHeight: t(170) }} />
+          <div style={{ alignSelf: 'flex-end', fontSize: t(12), marginRight: t(12) }}>Barueri, {dataPorExtenso()}.</div>
+          <div style={{ flex: '1 1 auto', minHeight: t(36), maxHeight: t(84) }} />
+
+          <div style={{ textAlign: 'center', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
+            <div style={{ borderTop: `${t(0.8)} solid #111`, width: t(226), margin: `0 auto ${t(8)}` }} />
+            Francisco Crizante
+            <div style={{ fontStyle: 'italic' }}>Técnico e Gestor</div>
+          </div>
+          <div style={{ flex: '1 1 auto', minHeight: t(16) }} />
+          <div style={{ textAlign: 'center', color: '#e10600', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
+            <b>– ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU –</b>
+            <br />CNPJ 69.451.196/0001-37
+            <br />Rua Dinamarca, 30 - Vila Engenho Novo - Barueri/SP - CEP 06416-100
+          </div>
         </div>
       </div>
     </div>
