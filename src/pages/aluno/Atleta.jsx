@@ -5,6 +5,7 @@ import { fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, toast, Empty } from '../../components/ui';
 import { DocumentosAtleta } from '../../components/DocumentosAtleta';
 import { DeclaracaoAtleta } from '../../components/Declaracao';
+import { ResultadosAtleta } from '../../components/Resultados';
 
 export default function Atleta({ user, base = "/aluno" }) {
   const db = useDB();
@@ -61,6 +62,7 @@ export default function Atleta({ user, base = "/aluno" }) {
         </Card>
       </div>
 
+      <div className="mt"><ResultadosAtleta aluno={user} /></div>
       <div className="mt"><DeclaracaoAtleta aluno={user} /></div>
 
       <h3 className="mt" style={{ marginBottom: 8 }}>📁 Documentos para competições</h3>

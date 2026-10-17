@@ -11,7 +11,7 @@ import { imprimirImagens } from '../lib/imprimir';
 const DIAS = { 1: 'Segunda-feira', 2: 'Terça-feira', 3: 'Quarta-feira', 4: 'Quinta-feira', 5: 'Sexta-feira', 6: 'Sábado', 0: 'Domingo' };
 const ORDEM = [1, 2, 3, 4, 5, 6, 0];
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-const dataPorExtenso = (d = new Date()) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+export const dataPorExtenso = (d = new Date()) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
 const W = 1654; // largura da exportação (A4 a 200 dpi)
 
 /** Horários de treino do atleta a partir da grade da filial (dias + início/fim de cada aula escolhida) */
@@ -141,13 +141,13 @@ export function DeclaracaoVisual({ d, innerRef }) {
   );
 }
 
-async function gerarImagem(node) {
+export async function gerarImagem(node) {
   const escala = W / node.getBoundingClientRect().width;
   return toJpeg(node, { pixelRatio: escala, cacheBust: true, backgroundColor: '#ffffff', quality: 0.92 });
 }
 
 /** Imprime ou baixa várias páginas A4 (uma imagem por página) */
-function entregar(imagens, formato, arquivo) {
+export function entregar(imagens, formato, arquivo) {
   if (formato === 'pdf') {
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     imagens.forEach((img, i) => {
@@ -164,7 +164,11 @@ function entregar(imagens, formato, arquivo) {
  * Declarações de vários alunos de uma vez (um PDF com uma página por aluno, ou impressão única).
  * Cada folha é montada fora da tela, convertida em imagem e descartada.
  */
-export async function declaracoesEmLote(db, alunos, formato, aoProgresso) {
+export const declaracoesEmLote = (db, alunos, formato, aoProgresso) =>
+  documentosEmLote(alunos, (a, ref) => <DeclaracaoVisual d={dadosDeclaracao(db, a)} innerRef={ref} />, formato, 'declaracao', aoProgresso);
+
+/** Gera um documento A4 por aluno (montado fora da tela) e entrega tudo num PDF ou numa impressão só */
+export async function documentosEmLote(alunos, renderizar, formato, prefixo, aoProgresso) {
   const caixa = document.createElement('div');
   caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff';
   document.body.appendChild(caixa);
@@ -175,17 +179,19 @@ export async function declaracoesEmLote(db, alunos, formato, aoProgresso) {
       aoProgresso?.(i + 1, alunos.length);
       let no = null;
       await new Promise((ok) => {
-        root.render(<DeclaracaoVisual d={dadosDeclaracao(db, a)} innerRef={(n) => (no = n)} />);
+        root.render(renderizar(a, (n) => (no = n)));
         setTimeout(ok, 60);
       });
       await Promise.all([...caixa.querySelectorAll('img')].map((im) => (im.complete ? 0 : new Promise((r) => ((im.onload = r), (im.onerror = r))))));
-      imagens.push(await gerarImagem(no));
+      // Documento com várias folhas (data-pagina): uma imagem por folha
+      const folhas = [...caixa.querySelectorAll('[data-pagina]')];
+      for (const n of folhas.length ? folhas : [no]) imagens.push(await gerarImagem(n));
     }
   } finally {
     root.unmount();
     caixa.remove();
   }
-  await entregar(imagens, formato, alunos.length === 1 ? `declaracao-${alunos[0].nome}`.replace(/[^\w-]+/g, '_') : `declaracoes-${alunos.length}-alunos`);
+  await entregar(imagens, formato, (alunos.length === 1 ? `${prefixo}-${alunos[0].nome}` : `${prefixo}-${alunos.length}-alunos`).replace(/[^\w-]+/g, '_'));
 }
 
 /** Campos da declaração que fazem sentido aplicar a vários alunos de uma vez (os dados pessoais ficam de cada um) */
