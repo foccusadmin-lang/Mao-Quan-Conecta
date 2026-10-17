@@ -1,5 +1,6 @@
 // Declaração da Associação (atleta filiado à FPKF / CBKW): A4, com os dados do atleta e a data do dia.
 import { useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { useDB, setDB, modalidadesAluno, DIAS_SEMANA } from '../lib/db';
@@ -104,8 +105,56 @@ async function gerarImagem(node) {
   return toJpeg(node, { pixelRatio: escala, cacheBust: true, backgroundColor: '#ffffff', quality: 0.92 });
 }
 
+/** Imprime ou baixa várias páginas A4 (uma imagem por página) */
+function entregar(imagens, formato, arquivo) {
+  if (formato === 'pdf') {
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    imagens.forEach((img, i) => {
+      if (i) pdf.addPage();
+      pdf.addImage(img, 'JPEG', 0, 0, 210, 297);
+    });
+    pdf.save(`${arquivo}.pdf`);
+    return;
+  }
+  const w = window.open('', '_blank');
+  if (!w) return toast('Permita pop-ups para imprimir.');
+  w.document.write(`<html><head><title>Declaração</title><style>@page{size:A4 portrait;margin:0}body{margin:0}img{width:210mm;height:297mm;display:block;page-break-after:always}</style></head><body>${imagens.map((i) => `<img src="${i}"/>`).join('')}<script>window.onload=()=>setTimeout(()=>window.print(),400)</script></body></html>`);
+  w.document.close();
+}
+
+/**
+ * Declarações de vários alunos de uma vez (um PDF com uma página por aluno, ou impressão única).
+ * Cada folha é montada fora da tela, convertida em imagem e descartada.
+ */
+export async function declaracoesEmLote(db, alunos, formato, aoProgresso) {
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff';
+  document.body.appendChild(caixa);
+  const root = createRoot(caixa);
+  const imagens = [];
+  try {
+    for (const [i, a] of alunos.entries()) {
+      aoProgresso?.(i + 1, alunos.length);
+      let no = null;
+      await new Promise((ok) => {
+        root.render(<DeclaracaoVisual d={dadosDeclaracao(db, a)} innerRef={(n) => (no = n)} />);
+        setTimeout(ok, 60);
+      });
+      await Promise.all([...caixa.querySelectorAll('img')].map((im) => (im.complete ? 0 : new Promise((r) => ((im.onload = r), (im.onerror = r))))));
+      imagens.push(await gerarImagem(no));
+    }
+  } finally {
+    root.unmount();
+    caixa.remove();
+  }
+  entregar(imagens, formato, alunos.length === 1 ? `declaracao-${alunos[0].nome}`.replace(/[^\w-]+/g, '_') : `declaracoes-${alunos.length}-alunos`);
+}
+
+/** Campos da declaração que fazem sentido aplicar a vários alunos de uma vez (os dados pessoais ficam de cada um) */
+const CAMPOS_GERAIS = ['genero', 'modalidade', 'horarios'];
+
 /** Perfil do atleta: visualizar, editar, imprimir e baixar a declaração (a data é sempre a do dia) */
-export function DeclaracaoAtleta({ aluno }) {
+export function DeclaracaoAtleta({ aluno, todos, titulo }) {
   const db = useDB();
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
@@ -116,17 +165,7 @@ export function DeclaracaoAtleta({ aluno }) {
   const exportar = async (formato) => {
     setBusy(true);
     try {
-      const img = await gerarImagem(ref.current);
-      if (formato === 'pdf') {
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        pdf.addImage(img, 'JPEG', 0, 0, 210, 297);
-        pdf.save(`${arquivo}.pdf`);
-      } else {
-        const w = window.open('', '_blank');
-        if (!w) return toast('Permita pop-ups para imprimir.');
-        w.document.write(`<html><head><title>Declaração</title><style>@page{size:A4 portrait;margin:0}body{margin:0}img{width:210mm;height:297mm}</style></head><body><img src="${img}"/><script>window.onload=()=>setTimeout(()=>window.print(),250)</script></body></html>`);
-        w.document.close();
-      }
+      entregar([await gerarImagem(ref.current)], formato, arquivo);
     } catch (e) {
       toast('Falha ao gerar: ' + e.message);
     } finally {
@@ -134,19 +173,42 @@ export function DeclaracaoAtleta({ aluno }) {
     }
   };
 
+  const limpo = () => ({
+    ...edit,
+    nome: edit.nome.trim(),
+    modalidade: edit.modalidade.trim(),
+    horarios: edit.horarios.filter((h) => h.inicio || h.fim),
+  });
   const salvar = () => {
-    const limpo = {
-      ...edit,
-      nome: edit.nome.trim(),
-      modalidade: edit.modalidade.trim(),
-      horarios: edit.horarios.filter((h) => h.inicio || h.fim),
-    };
+    const l = limpo();
     setDB((dd) => {
       const x = dd.alunos.find((y) => y.id === aluno.id);
-      if (x) x.declaracao = { ...limpo, atualizadoEm: new Date().toISOString() };
+      if (x) x.declaracao = { ...l, atualizadoEm: new Date().toISOString() };
     });
     setEdit(null);
-    toast('Declaração atualizada.');
+    toast('Declaração atualizada só para ' + (l.nome || aluno.nome) + '.');
+  };
+  // Aplica a todos os alunos da lista só o que mudou (tratamento, modalidade, horários); nome, RG e CPF ficam de cada um
+  const salvarTodos = () => {
+    const l = limpo();
+    const mudou = CAMPOS_GERAIS.filter((k) => JSON.stringify(l[k]) !== JSON.stringify(d[k]));
+    if (!mudou.length) return toast('Nada para aplicar a todos: altere o tratamento, a modalidade ou os horários.');
+    const nomes = { genero: 'tratamento', modalidade: 'modalidade', horarios: 'dias e horários' };
+    if (!window.confirm(`Aplicar ${mudou.map((k) => nomes[k]).join(', ')} a ${todos.length} aluno(s)? Nome, RG e CPF continuam os de cada um.`)) return;
+    const agora = new Date().toISOString();
+    setDB((dd) => {
+      for (const t of todos) {
+        const x = dd.alunos.find((y) => y.id === t.id);
+        if (!x) continue;
+        const base = x.declaracao || {};
+        x.declaracao = { ...base, ...Object.fromEntries(mudou.map((k) => [k, l[k]])), atualizadoEm: agora };
+      }
+      // Os dados pessoais editados valem para este aluno
+      const x = dd.alunos.find((y) => y.id === aluno.id);
+      if (x) x.declaracao = { ...x.declaracao, nome: l.nome, rg: l.rg, cpf: l.cpf };
+    });
+    setEdit(null);
+    toast(`Alteração aplicada a ${todos.length} aluno(s).`);
   };
   const restaurar = () => {
     setDB((dd) => {
@@ -159,8 +221,8 @@ export function DeclaracaoAtleta({ aluno }) {
   const mudaH = (i, patch) => setEdit({ ...edit, horarios: edit.horarios.map((h, j) => (j === i ? { ...h, ...patch } : h)) });
 
   return (
-    <Card title="📄 Declaração da Associação (FPKF / CBKW)">
-      <p className="xs muted" style={{ marginTop: 0 }}>Preenchida com seus dados. A data é sempre a do dia em que você imprime ou baixa.</p>
+    <Card title={titulo || '📄 Declaração da Associação (FPKF / CBKW)'}>
+      <p className="xs muted" style={{ marginTop: 0 }}>{todos ? 'Preenchida com os dados do aluno.' : 'Preenchida com seus dados.'} A data é sempre a do dia em que você imprime ou baixa.</p>
       <div className="row mb" style={{ gap: 6, flexWrap: 'wrap' }}>
         <button className="btn sm" disabled={busy} onClick={() => exportar('pdf')}>⬇ Baixar PDF</button>
         <button className="btn sm ghost" disabled={busy} onClick={() => exportar('print')}>🖨 Imprimir</button>
@@ -182,6 +244,7 @@ export function DeclaracaoAtleta({ aluno }) {
             <Field label="CPF"><input value={maskCPF(edit.cpf || '')} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} maxLength={14} /></Field>
             <Field label="Modalidade" style={{ gridColumn: '1/-1' }}><input value={edit.modalidade} onChange={(e) => setEdit({ ...edit, modalidade: e.target.value })} placeholder="Ex.: Tai Chi Chuan" /></Field>
           </div>
+          {todos?.length > 1 && <div className="xs muted mb">Ao aplicar a todos, vão para os demais alunos só o tratamento, a modalidade e os dias e horários que você mudar. Nome, RG e CPF são sempre de cada aluno.</div>}
           <b className="small">Dias e horários de treino</b>
           {edit.horarios.map((h, i) => (
             <div key={i} className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
@@ -195,8 +258,10 @@ export function DeclaracaoAtleta({ aluno }) {
             </div>
           ))}
           <button type="button" className="btn sm ghost mt" onClick={() => setEdit({ ...edit, horarios: [...edit.horarios, { dia: 1, inicio: '', fim: '' }] })}>+ Dia de treino</button>
+          {todos?.length > 1 && <div className="small mt" style={{ fontWeight: 600 }}>Deseja alterar apenas este aluno ou todos os alunos?</div>}
           <div className="row mt" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <button className="btn" onClick={salvar}>Salvar declaração</button>
+            <button className="btn" onClick={salvar}>{todos?.length > 1 ? `Salvar só para ${(edit.nome || aluno.nome).split(' ')[0]}` : 'Salvar declaração'}</button>
+            {todos?.length > 1 && <button className="btn dark" onClick={salvarTodos}>Aplicar a todos os {todos.length} alunos</button>}
             <button className="btn ghost" onClick={() => setEdit(null)}>Cancelar</button>
             {aluno.declaracao && <button className="btn ghost" onClick={restaurar}>↺ Usar dados do cadastro</button>}
           </div>
