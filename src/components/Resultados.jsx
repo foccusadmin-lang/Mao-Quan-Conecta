@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { setDB } from '../lib/db';
 import { maskCPF, maskRG, uid } from '../lib/utils';
 import { Card, toast } from './ui';
-import { dataPorExtenso, gerarImagem, entregar, documentosEmLote } from './Declaracao';
+import { gerarImagem, entregar, documentosEmLote } from './Declaracao';
 
 export const POSICOES = ['1º Lugar', '2º Lugar', '3º Lugar', '4º Lugar', '5º Lugar', '6º Lugar', '7º Lugar', '8º Lugar', 'Participação'];
 const ordemPos = (p) => (POSICOES.indexOf(p) < 0 ? 99 : POSICOES.indexOf(p));
@@ -45,7 +45,7 @@ export function paginarResultados(itens = []) {
   const paginas = [[]];
   for (const r of lista) {
     const atual = paginas.at(-1);
-    const cap = paginas.length === 1 ? 44 : 72;
+    const cap = paginas.length === 1 ? 54 : 80;
     if (atual.length && linhasEstimadas([...atual, r]) > cap) paginas.push([r]);
     else atual.push(r);
   }
@@ -57,7 +57,6 @@ export function ResultadosVisual({ aluno, itens, innerRef, pagina = 1, total = 1
   const grupos = agruparResultados(itens);
   const linhas = grupos.reduce((s, g) => s + 1 + g.campeonatos.reduce((t, c) => t + 1 + c.rs.length, 0), 0);
   const duas = linhas > 26 || pagina > 1;
-  const ultima = pagina === total;
   const t = (pt) => `${(pt / 595.32) * 100}cqw`;
   const periodo = periodoGeral ?? periodoResultados(itens);
   // Ajuste automático: se a lista não couber na folha, a letra da lista diminui até caber (o rodapé nunca sai da página)
@@ -117,18 +116,6 @@ export function ResultadosVisual({ aluno, itens, innerRef, pagina = 1, total = 1
           </div>
 
           <div style={{ flex: '1 1 auto', minHeight: t(12) }} />
-          {ultima && (
-            <>
-              <div style={{ alignSelf: 'flex-end', fontSize: t(12), marginRight: t(12) }}>Barueri, {dataPorExtenso()}.</div>
-              <div style={{ flex: '0 1 auto', minHeight: t(24), height: t(48) }} />
-              <div style={{ textAlign: 'center', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
-                <div style={{ borderTop: `${t(0.8)} solid #111`, width: t(226), margin: `0 auto ${t(8)}` }} />
-                Francisco Crizante
-                <div style={{ fontStyle: 'italic' }}>Técnico e Gestor</div>
-              </div>
-              <div style={{ flex: '0 1 auto', minHeight: t(10), height: t(30) }} />
-            </>
-          )}
           {total > 1 && <div style={{ textAlign: 'right', fontSize: t(10), color: '#555', marginBottom: t(4) }}>Página {pagina} de {total}</div>}
           <div style={{ textAlign: 'center', color: '#e10600', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
             <b>– ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU –</b>
