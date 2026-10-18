@@ -100,9 +100,12 @@ export function HorariosFilialEditor({ filial }) {
   const adicionar = () => {
     if (!novo.inicio || !novo.fim) return toast('Informe o início e o fim do horário.');
     if (novo.fim <= novo.inicio) return toast('O fim precisa ser depois do início.');
+    if (!novo.dias.length) return toast('Marque o dia (ou os dias) da aula.');
     if (lista.some((h) => cruzaDias(novo.dias, h.dias || []) && novo.inicio < h.fim && h.inicio < novo.fim)) return toast('Esse horário se sobrepõe a outro já cadastrado no mesmo dia.');
-    const dias = novo.dias.length === 7 ? [] : DIAS_SEMANA.map(([d]) => d).filter((d) => novo.dias.includes(d));
-    setLista([...lista, { id: uid('hr'), turno: turnoDoHorario(novo.inicio), inicio: novo.inicio, fim: novo.fim, ...(dias.length ? { dias } : {}), ...(novo.aula.trim() ? { aula: novo.aula.trim() } : {}) }].sort((a, b) => a.inicio.localeCompare(b.inicio)));
+    // Um horário por dia: o aluno escolhe só os dias em que treina (terça sem quinta, por exemplo)
+    const dias = DIAS_SEMANA.map(([d]) => d).filter((d) => novo.dias.includes(d));
+    const base = { turno: turnoDoHorario(novo.inicio), inicio: novo.inicio, fim: novo.fim, ...(novo.aula.trim() ? { aula: novo.aula.trim() } : {}) };
+    setLista([...lista, ...dias.map((d) => ({ ...base, id: uid('hr'), dias: [d] }))].sort((a, b) => a.inicio.localeCompare(b.inicio) || (a.dias?.[0] ?? 0) - (b.dias?.[0] ?? 0)));
     setNovo({ ...novo, inicio: '', fim: '', aula: '' }); // mantém os dias marcados para cadastrar o próximo horário do mesmo dia
   };
   const salvar = () => {
@@ -145,7 +148,7 @@ export function HorariosFilialEditor({ filial }) {
             </button>
           );
         })}
-        <span className="xs muted" style={{ alignSelf: 'center' }}>{novo.dias.length ? '' : 'nenhum dia marcado = todos os dias'}</span>
+        <span className="xs muted" style={{ alignSelf: 'center' }}>{novo.dias.length > 1 ? `vai criar ${novo.dias.length} horários, um por dia` : novo.dias.length ? '' : 'marque o dia da aula'}</span>
       </div>
       <div className="row mt" style={{ gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <label className="small">Início<br /><input type="time" value={novo.inicio} onChange={(e) => setNovo({ ...novo, inicio: e.target.value })} /></label>

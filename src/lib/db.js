@@ -102,6 +102,22 @@ export const useDB = () => useSyncExternalStore(subscribe, () => state);
 export const useSession = () => useSyncExternalStore(subscribe, () => session);
 export const useAuth = () => useSyncExternalStore(subscribe, () => auth);
 
+/**
+ * Somente em desenvolvimento (não vai para o app publicado): abre um painel com dados fictícios,
+ * sem login e sem gravar nada no servidor — usado para gravar os vídeos tutoriais.
+ */
+export function entrarModoTutorial(role, id, dados) {
+  if (!import.meta.env.DEV) return;
+  sessaoSupabase = null; // sem sessão real: nada é sincronizado
+  servidor = null;
+  clearInterval(rotinaTimer);
+  state = normalizar(dados);
+  // 'novo': conta Google ainda sem cadastro (tela de primeiro acesso)
+  session = role === 'novo' ? null : { role, id };
+  auth = role === 'novo' ? { status: 'novo', email: 'ana@exemplo.com', nome: 'Ana Exemplo', foto: null } : { status: 'pronto', email: 'tutorial@exemplo.com' };
+  emit();
+}
+
 // ---------- Filial ativa do professor (quem responde por mais de uma filial) ----------
 const CHAVE_FILIAL = 'mq-filial-ativa';
 let filialAtiva = null;
