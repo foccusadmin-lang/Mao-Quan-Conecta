@@ -14,6 +14,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || !req.url.startsWith(self.location.origin)) return;
+  // Vídeos (tutoriais) vêm em partes (Range) e são grandes: sempre direto da rede, sem guardar no cache
+  if (req.headers.has('range') || /\.(mp4|webm)(\?|$)/.test(req.url)) return;
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).catch(() => caches.match('./index.html')));
     return;

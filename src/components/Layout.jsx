@@ -28,6 +28,7 @@ export const NAVS = {
     ['institucional', '📜', 'Institucional'],
     ['termos', '✍️', 'Termos & Fidelidade'],
     ['config', '⚙️', 'Configurações'],
+    ['tutoriais', '📘', 'Tutoriais'],
   ],
   professor: [
     ['', '📊', 'Minha Unidade'],
@@ -51,6 +52,7 @@ export const NAVS = {
     ['atleta', '🏆', 'Atleta'],
     ['meu-monitoramento', '📝', 'Meu Monitoramento'],
     ['dados', '📝', 'Meus Dados'],
+    ['tutoriais', '📘', 'Tutoriais'],
   ],
   aluno: [
     ['', '🏠', 'Início'],
@@ -67,6 +69,7 @@ export const NAVS = {
     ['plano', '📋', 'Meu Plano'],
     ['pagamentos', '💳', 'Pagamentos'],
     ['perfil', '📝', 'Meus Dados'],
+    ['tutoriais', '📘', 'Tutoriais'],
   ],
 };
 

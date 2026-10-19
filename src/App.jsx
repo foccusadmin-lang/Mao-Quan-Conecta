@@ -36,6 +36,7 @@ import Monitoramento from './pages/aluno/Monitoramento';
 import MonitoramentoEquipe from './pages/shared/MonitoramentoEquipe';
 import Declaracoes from './pages/shared/Declaracoes';
 import ResultadosAtletas from './pages/shared/ResultadosAtletas';
+import Tutoriais from './pages/shared/Tutoriais';
 import Estudo from './pages/professor/Estudo';
 import Filiacao from './pages/professor/Filiacao';
 import ProfCarteira from './pages/professor/Carteira';
@@ -122,6 +123,7 @@ export default function App() {
             <Route path="monitoramento" element={<MonitoramentoEquipe user={user} />} />
             <Route path="declaracoes" element={<Declaracoes user={user} />} />
             <Route path="resultados" element={<ResultadosAtletas user={user} />} />
+            <Route path="tutoriais" element={<Tutoriais user={user} />} />
             <Route path="graduacao" element={<Graduacao user={user} />} />
             <Route path="financeiro" element={<Financeiro user={user} />} />
             <Route path="carteirinhas" element={<Carteirinhas />} />
@@ -143,6 +145,7 @@ export default function App() {
             <Route path="monitoramento" element={<MonitoramentoEquipe user={user} />} />
             <Route path="declaracoes" element={<Declaracoes user={user} />} />
             <Route path="resultados" element={<ResultadosAtletas user={user} />} />
+            <Route path="tutoriais" element={<Tutoriais user={user} />} />
             <Route path="meu-monitoramento" element={<ComoPraticante user={user}>{(pr) => <Monitoramento user={pr} />}</ComoPraticante>} />
             {temRecurso(user, 'graduacao') && <Route path="graduacao" element={<Graduacao user={user} />} />}
             {temRecurso(user, 'financeiro') && <Route path="financeiro" element={<Financeiro user={user} />} />}
@@ -180,6 +183,7 @@ export default function App() {
               <Route path="pagamentos" element={<Pagamentos user={user} />} />
               <Route path="certificados" element={<Certificados user={user} />} />
               <Route path="perfil" element={<Perfil user={user} />} />
+              <Route path="tutoriais" element={<Tutoriais user={user} />} />
             </Route>
           </Route>
         )}
