@@ -18,6 +18,7 @@ export const TUTORIAIS = [
       "Quando o acesso for liberado, entre de novo no aplicativo. Você vai ver os termos da Associação. Leia com atenção.",
       "Marque a caixa Li e aceito em cada um dos termos.",
       "Por fim, digite o seu nome completo como assinatura e toque em Assinar e continuar. Pronto! Agora você já pode usar o aplicativo."
-    ]
+    ],
+    "youtube": "https://youtube.com/shorts/ZwnphvgwMgo"
   }
 ];

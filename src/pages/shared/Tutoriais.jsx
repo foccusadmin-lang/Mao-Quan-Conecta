@@ -51,6 +51,8 @@ export default function Tutoriais({ user }) {
                   title={t.titulo}
                   allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
                   allowFullScreen
+                  // O YouTube recusa tocar (erro 153) quando não recebe a origem do site
+                  referrerPolicy="strict-origin-when-cross-origin"
                   style={{ width: '100%', height: '100%', border: 0 }}
                 />
               </div>
