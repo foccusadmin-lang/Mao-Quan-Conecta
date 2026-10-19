@@ -20,5 +20,23 @@ export const TUTORIAIS = [
       "Por fim, digite o seu nome completo como assinatura e toque em Assinar e continuar. Pronto! Agora você já pode usar o aplicativo."
     ],
     "youtube": "https://youtube.com/shorts/ZwnphvgwMgo"
+  },
+  {
+    "id": "aluno-meu-plano",
+    "publico": "aluno",
+    "titulo": "Escolher ou mudar o plano",
+    "resumo": "Modalidades, pacote, plano família, valor da mensalidade e dia de vencimento.",
+    "duracao": 75,
+    "passos": [
+      "Neste tutorial você vai ver como escolher ou mudar o seu plano. Primeiro, toque no menu, o botão com três tracinhos no alto da tela.",
+      "No menu, escolha Meu Plano.",
+      "No alto da tela aparece o seu plano atual e o valor que você paga por mês.",
+      "Escolha o tipo de plano: modalidades avulsas, o pacote completo com todas as modalidades, ou o pacote família.",
+      "Toque nas modalidades que você treina. Na Sede, a primeira modalidade tem o valor normal, e cada modalidade a mais soma cinquenta reais.",
+      "O valor da mensalidade é atualizado na hora, logo abaixo.",
+      "Se quiser, escolha também o dia do mês em que a sua mensalidade vai vencer.",
+      "Para terminar, toque em Salvar plano. A mudança vale a partir da próxima mensalidade."
+    ],
+    "youtube": "https://youtube.com/shorts/fAHhQYQNCek"
   }
 ];
