@@ -399,10 +399,10 @@ export function DiaVencimento({ aluno }) {
 // ---------------------------------------------------------------------------
 // Professor / Central: mensalidade padrão ou personalizada (desconto, benefício…)
 // ---------------------------------------------------------------------------
-export function ValorMensalidade({ aluno, user }) {
+export function ValorMensalidade({ aluno, user, personalizar, onFeito }) {
   const db = useDB();
   const m = mensalidadeDoAluno(db, aluno);
-  const [modo, setModo] = useState(m.personalizada ? 'personalizada' : 'padrao');
+  const [modo, setModo] = useState(m.personalizada || personalizar ? 'personalizada' : 'padrao');
   const [valor, setValor] = useState(m.personalizada ? String(m.valor) : '');
   const [motivo, setMotivo] = useState(m.motivo || '');
   const [aplicarAberta, setAplicarAberta] = useState(true);
@@ -431,7 +431,8 @@ export function ValorMensalidade({ aluno, user }) {
       }
       notify(d, aluno.id, 'Valor da mensalidade atualizado', personalizada ? `Sua mensalidade passa a ser ${brl(novo)} (${motivo.trim()}).` : `Sua mensalidade voltou ao valor padrão: ${brl(novo)}.`);
     });
-    toast('Valor da mensalidade salvo.');
+    toast(personalizada ? `Mensalidade de ${aluno.nome.split(' ')[0]} combinada em ${brl(novo)}/mês.` : 'Mensalidade voltou ao valor padrão.');
+    onFeito?.();
   };
 
   return (
@@ -443,14 +444,14 @@ export function ValorMensalidade({ aluno, user }) {
         </label>
         <label className="check">
           <input type="radio" name={`valor-${aluno.id}`} checked={modo === 'personalizada'} onChange={() => setModo('personalizada')} />
-          <div>Mensalidade personalizada<div className="xs muted">Desconto ou benefício não previsto pelo sistema</div></div>
+          <div>Valor combinado (personalizado)<div className="xs muted">Acordo com o Mestre, desconto ou benefício não previsto pelo sistema</div></div>
         </label>
         {modo === 'personalizada' && (
           <div className="form-grid">
             <Field label="Valor mensal (R$)" hint={valor !== '' && +valor < m.padrao ? `Desconto de ${brl(m.padrao - +valor)} (${Math.round((1 - +valor / m.padrao) * 100)}%)` : ''}>
               <input type="number" min="0" step="0.01" value={valor} onChange={(e) => setValor(e.target.value)} placeholder={String(m.padrao)} />
             </Field>
-            <Field label="Motivo"><input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: bolsa parcial, benefício social" /></Field>
+            <Field label="Motivo"><input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: combinado com o Mestre, bolsa parcial" /></Field>
           </div>
         )}
         {aberta && (

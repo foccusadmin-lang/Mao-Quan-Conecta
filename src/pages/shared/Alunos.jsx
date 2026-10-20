@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useDB, setDB, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail } from '../../lib/db';
+import { useDB, setDB, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail, mensalidadeDoAluno } from '../../lib/db';
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
 import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -614,6 +614,7 @@ function PlanoDoAluno({ a, user }) {
   const filial = db.filiais.find((f) => f.id === a.filialId);
   const [plano, setPlano] = useState(a.plano || null);
   const [salvando, setSalvando] = useState(false);
+  const [valorAberto, setValorAberto] = useState(false);
   if (!filial) return <Empty icon="🏯">Aluno sem filial.</Empty>;
   if (a.isentoPor) {
     const tit = db.alunos.find((x) => x.id === a.isentoPor);
@@ -637,14 +638,36 @@ function PlanoDoAluno({ a, user }) {
 
   return (
     <div className="col">
-      {a.plano && temPlanos(filial) && (
-        <div className="alert ink">Plano atual: <b>{resumoPlano(filial, a.plano)}</b> · {brl(valorPlano(filial, a.plano))}/mês</div>
+      {(() => {
+        // Valor que o aluno paga de fato: o do plano ou o combinado pela equipe (ex.: acerto com o Mestre)
+        const m = mensalidadeDoAluno(db, a);
+        return (
+          <div className="alert ink" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              {a.plano && temPlanos(filial) ? <>Plano atual: <b>{resumoPlano(filial, a.plano)}</b> · </> : 'Mensalidade: '}
+              {m.personalizada ? (
+                <>
+                  <b>{brl(m.valor)}/mês</b> <span className="badge gold">valor combinado</span>
+                  <div className="xs muted">Valor do plano: {brl(m.padrao)} · {m.motivo || 'sem motivo'}{m.por ? ` · por ${m.por}` : ''}</div>
+                </>
+              ) : (
+                <>{brl(m.valor)}/mês</>
+              )}
+            </div>
+            {!a.isento && !valorAberto && <button type="button" className="btn sm" onClick={() => setValorAberto(true)}>💲 Alterar valor mensal</button>}
+          </div>
+        );
+      })()}
+      {valorAberto && !a.isento && (
+        <div>
+          <ValorMensalidade key={a.id + (a.mensalidadePersonalizada?.em || '')} aluno={a} user={user} personalizar onFeito={() => setValorAberto(false)} />
+          <button type="button" className="btn sm ghost mt" onClick={() => setValorAberto(false)}>Fechar</button>
+        </div>
       )}
       <EscolhaPlano filial={filial} value={plano} onChange={setPlano} equipe />
       {temPlanos(filial) && <div><button className="btn" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando…' : 'Salvar plano'}</button></div>}
       {!a.isento && (
         <div className="grid g2">
-          <ValorMensalidade key={a.id + (a.mensalidadePersonalizada?.em || '')} aluno={a} user={user} />
           <DiaVencimento aluno={a} />
         </div>
       )}
