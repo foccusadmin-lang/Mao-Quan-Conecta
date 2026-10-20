@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { useDB, filialNome, professorVeAluno, alunoNaFilial } from '../../lib/db';
+import { useDB, setDB, filialNome, professorVeAluno, alunoNaFilial } from '../../lib/db';
 import { PageHead, Card, Modal, Avatar, Empty, Search, toast } from '../../components/ui';
-import { DeclaracaoAtleta, declaracoesEmLote, dadosDeclaracao } from '../../components/Declaracao';
+import { DeclaracaoAtleta, declaracoesEmLote, dadosDeclaracao, ENTIDADES } from '../../components/Declaracao';
+
+const CURTO = { maoquan: 'Mao Quan Kung-fu Wushu', maochuen: 'Mao Chuen do Brasil' };
 
 /** Professor / Central: declarações da Associação (FPKF / CBKW) de cada aluno ou de todos de uma vez */
 export default function Declaracoes({ user }) {
@@ -38,6 +40,19 @@ export default function Declaracoes({ user }) {
     }
   };
 
+  // Entidade de todos os selecionados de uma vez (só a declaração muda; dados de cada aluno continuam os dele)
+  const entidadesSel = new Set(sel.map((a) => dadosDeclaracao(db, a).entidade));
+  const entidadeSel = entidadesSel.size === 1 ? [...entidadesSel][0] : '';
+  const trocarEntidade = (ent) => {
+    if (!ent || !sel.length) return;
+    const e = ENTIDADES[ent];
+    if (!window.confirm(`Usar “${e.razao}” (CNPJ ${e.cnpj}) na declaração de ${sel.length} aluno(s) selecionado(s)?`)) return;
+    const ids = new Set(sel.map((a) => a.id));
+    const agora = new Date().toISOString();
+    setDB((d) => d.alunos.forEach((x) => ids.has(x.id) && (x.declaracao = { ...(x.declaracao || {}), entidade: ent, atualizadoEm: agora })));
+    toast(`Entidade alterada em ${sel.length} declaração(ões).`);
+  };
+
   const al = aberto && db.alunos.find((a) => a.id === aberto);
 
   return (
@@ -60,7 +75,14 @@ export default function Declaracoes({ user }) {
               <input type="checkbox" checked={sel.length === lista.length && lista.length > 0} onChange={(e) => setMarcados(e.target.checked ? null : new Set())} /> Selecionar todos ({sel.length}/{lista.length})
             </label>
           </div>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <label className="small" style={{ display: 'flex', alignItems: 'center', gap: 6 }} title="Entidade que declara, para todos os alunos selecionados">
+              Entidade:
+              <select value={entidadeSel} disabled={!sel.length || !!gerando} onChange={(e) => trocarEntidade(e.target.value)} style={{ maxWidth: 230 }}>
+                {!entidadeSel && <option value="">Misto ({sel.length} selecionados)</option>}
+                {Object.keys(ENTIDADES).map((k) => <option key={k} value={k}>{CURTO[k]}</option>)}
+              </select>
+            </label>
             {gerando ? (
               <span className="small muted">⏳ {gerando}</span>
             ) : (
@@ -84,7 +106,8 @@ export default function Declaracoes({ user }) {
                 <div className="xs muted">
                   {isAdmin && !filialAtual ? filialNome(db, a.filialId) + ' · ' : ''}
                   {d.modalidade || 'sem modalidade'}
-                  {a.declaracao && ' · ✏️ editada'}
+                  {Object.keys(a.declaracao || {}).some((k) => k !== 'entidade' && k !== 'atualizadoEm') && ' · ✏️ editada'}
+                  {d.entidade === 'maochuen' && <span className="badge" style={{ marginLeft: 6 }}>Mao Chuen</span>}
                 </div>
                 {falta.length > 0 && <div className="xs" style={{ color: '#b45309' }}>⚠️ Falta: {falta.join(', ')}</div>}
               </div>
