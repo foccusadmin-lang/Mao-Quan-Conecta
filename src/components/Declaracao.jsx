@@ -12,6 +12,11 @@ const DIAS = { 1: 'Segunda-feira', 2: 'Terça-feira', 3: 'Quarta-feira', 4: 'Qui
 const ORDEM = [1, 2, 3, 4, 5, 6, 0];
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 export const dataPorExtenso = (d = new Date()) => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+// Entidade que declara (só neste documento; o resto do app segue com a Mao Quan)
+export const ENTIDADES = {
+  maoquan: { razao: 'Associação Mao Quan Kung-fu Wushu', rodape: 'ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU', cnpj: '69.451.196/0001-37' },
+  maochuen: { razao: 'Associação Mao Chuen do Brasil, Cultural e Artístico Marcial', rodape: 'ASSOCIAÇÃO MAO CHUEN DO BRASIL, CULTURAL E ARTÍSTICO MARCIAL', cnpj: '02.273.448/0001-04' },
+};
 const W = 1654; // largura da exportação (A4 a 200 dpi)
 
 /** Horários de treino do atleta a partir da grade da filial (dias + início/fim de cada aula escolhida) */
@@ -35,6 +40,7 @@ export function dadosDeclaracao(db, a) {
     cpf: d.cpf || a.cpf || '',
     modalidade: d.modalidade || mods.join(' e ') || '',
     genero: d.genero || '',
+    entidade: ENTIDADES[d.entidade] ? d.entidade : 'maoquan',
     horarios: d.horarios?.length ? d.horarios : horariosDaGrade(db, a),
   };
 }
@@ -64,6 +70,7 @@ export function horariosPorDia(horarios = []) {
 
 /** A folha A4 (unidades cqw: tudo escala com a largura). Data e assinatura vêm depois do texto: nunca ficam por baixo dele */
 export function DeclaracaoVisual({ d, innerRef }) {
+  const ent = ENTIDADES[d.entidade] || ENTIDADES.maoquan;
   const fem = d.genero === 'f';
   const masc = d.genero === 'm';
   const art = fem ? 'a' : masc ? 'o' : 'o(a)';
@@ -92,7 +99,7 @@ export function DeclaracaoVisual({ d, innerRef }) {
           </div>
 
           <p style={{ fontSize: t(12), lineHeight: 1.45, textAlign: 'justify', margin: `${t(26)} 0 0` }}>
-            A entidade <span style={b}>Associação Mao Quan Kung-fu Wushu</span>, inscrita no CNPJ sob o nº <span style={b}>69.451.196/0001-37</span>, com sede na Rua Dinamarca, 30, Vila Engenho Novo, CEP 06416-100, Barueri/SP, vem por meio desta <span style={b}>DECLARAR</span> que {art} atleta{' '}
+            A entidade <span style={b}>{ent.razao}</span>, inscrita no CNPJ sob o nº <span style={b}>{ent.cnpj}</span>, com sede na Rua Dinamarca, 30, Vila Engenho Novo, CEP 06416-100, Barueri/SP, vem por meio desta <span style={b}>DECLARAR</span> que {art} atleta{' '}
             <span style={b}>{d.nome || '________________'}</span>, {port} do RG nº <span style={b}>{d.rg ? maskRG(d.rg) : '____________'}</span> e do CPF nº{' '}
             <span style={b}>{d.cpf ? maskCPF(d.cpf) : '______________'}</span>, praticante da modalidade <span style={b}>{d.modalidade || '__________'}</span>, faz parte do nosso quadro de atletas e treina regularmente nos seguintes dias e horários:
           </p>
@@ -131,8 +138,8 @@ export function DeclaracaoVisual({ d, innerRef }) {
           </div>
           <div style={{ flex: '1 1 auto', minHeight: t(16) }} />
           <div style={{ textAlign: 'center', color: '#e10600', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
-            <b>– ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU –</b>
-            <br />CNPJ 69.451.196/0001-37
+            <b>– {ent.rodape} –</b>
+            <br />CNPJ {ent.cnpj}
             <br />Rua Dinamarca, 30 - Vila Engenho Novo - Barueri/SP - CEP 06416-100
           </div>
         </div>
@@ -195,11 +202,13 @@ export async function documentosEmLote(alunos, renderizar, formato, prefixo, aoP
 }
 
 /** Campos da declaração que fazem sentido aplicar a vários alunos de uma vez (os dados pessoais ficam de cada um) */
-const CAMPOS_GERAIS = ['genero', 'modalidade', 'horarios'];
+const CAMPOS_GERAIS = ['entidade', 'genero', 'modalidade', 'horarios'];
 
 /** Perfil do atleta: visualizar, editar, imprimir e baixar a declaração (a data é sempre a do dia) */
 export function DeclaracaoAtleta({ aluno, todos, titulo }) {
   const db = useDB();
+  // Só a equipe (tela Declarações, que passa a lista de alunos) escolhe a entidade; o atleta não
+  const equipe = !!todos;
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -236,8 +245,8 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
   const salvarTodos = () => {
     const l = limpo();
     const mudou = CAMPOS_GERAIS.filter((k) => JSON.stringify(l[k]) !== JSON.stringify(d[k]));
-    if (!mudou.length) return toast('Nada para aplicar a todos: altere o tratamento, a modalidade ou os horários.');
-    const nomes = { genero: 'tratamento', modalidade: 'modalidade', horarios: 'dias e horários' };
+    if (!mudou.length) return toast('Nada para aplicar a todos: altere a entidade, o tratamento, a modalidade ou os horários.');
+    const nomes = { entidade: 'entidade', genero: 'tratamento', modalidade: 'modalidade', horarios: 'dias e horários' };
     if (!window.confirm(`Aplicar ${mudou.map((k) => nomes[k]).join(', ')} a ${todos.length} aluno(s)? Nome, RG e CPF continuam os de cada um.`)) return;
     const agora = new Date().toISOString();
     setDB((dd) => {
@@ -257,7 +266,10 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
   const restaurar = () => {
     setDB((dd) => {
       const x = dd.alunos.find((y) => y.id === aluno.id);
-      if (x) delete x.declaracao;
+      if (!x) return;
+      const ent = x.declaracao?.entidade;
+      if (!equipe && ent) x.declaracao = { entidade: ent };
+      else delete x.declaracao;
     });
     setEdit(null);
     toast('Declaração refeita com os dados do cadastro.');
@@ -276,6 +288,13 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
       {edit && (
         <div className="card mb" style={{ background: '#faf8f6' }}>
           <div className="form-grid">
+            {equipe && (
+              <Field label="Entidade que declara" style={{ gridColumn: '1/-1' }}>
+                <select value={edit.entidade} onChange={(e) => setEdit({ ...edit, entidade: e.target.value })}>
+                  {Object.entries(ENTIDADES).map(([k, e]) => <option key={k} value={k}>{e.razao} — CNPJ {e.cnpj}</option>)}
+                </select>
+              </Field>
+            )}
             <Field label="Nome completo"><input value={edit.nome} onChange={(e) => setEdit({ ...edit, nome: e.target.value })} /></Field>
             <Field label="Tratamento no texto">
               <select value={edit.genero} onChange={(e) => setEdit({ ...edit, genero: e.target.value })}>
@@ -288,7 +307,7 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
             <Field label="CPF"><input value={maskCPF(edit.cpf || '')} inputMode="numeric" onChange={(e) => setEdit({ ...edit, cpf: maskCPF(e.target.value) })} maxLength={14} /></Field>
             <Field label="Modalidade" style={{ gridColumn: '1/-1' }}><input value={edit.modalidade} onChange={(e) => setEdit({ ...edit, modalidade: e.target.value })} placeholder="Ex.: Tai Chi Chuan" /></Field>
           </div>
-          {todos?.length > 1 && <div className="xs muted mb">Ao aplicar a todos, vão para os demais alunos só o tratamento, a modalidade e os dias e horários que você mudar. Nome, RG e CPF são sempre de cada aluno.</div>}
+          {todos?.length > 1 && <div className="xs muted mb">Ao aplicar a todos, vão para os demais alunos só a entidade, o tratamento, a modalidade e os dias e horários que você mudar. Nome, RG e CPF são sempre de cada aluno.</div>}
           <b className="small">Dias e horários de treino</b>
           {edit.horarios.map((h, i) => (
             <div key={i} className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
