@@ -6,6 +6,7 @@ import { PixBox, useRecebedor, recebedorLocal } from '../../components/shared';
 import { PlanosFilialEditor, EditarCobranca } from '../../components/Planos';
 import { ConferenciaPagamento, SeloComprovante } from '../../components/Comprovante';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
+import { LembreteGeral } from '../../components/LembreteGeral';
 
 const TIPO = { mensalidade: 'Mensalidade', filiacao: 'Filiação', exame: 'Taxa de exame', manutencao: 'Manutenção', outro: 'Outro' };
 
@@ -21,6 +22,7 @@ export default function Financeiro({ user }) {
   const [conferir, setConferir] = useState(null);
   const [retro, setRetro] = useState(false);
   const [editar, setEditar] = useState(null);
+  const [lembreteGeral, setLembreteGeral] = useState(false);
   const [ask, confirmEl] = useConfirm();
   const hoje = todayISO();
   const { rec: recMinhaFilial } = useRecebedor(isAdmin ? null : user.filialId);
@@ -85,6 +87,10 @@ export default function Financeiro({ user }) {
       '_blank'
     );
 
+  // Lembrete geral: mensalidades vencidas (sem comprovante aguardando conferência); a própria mensalidade do professor fica de fora
+  const vencidasLembrete = escopo.filter((p) => p.tipo === 'mensalidade' && p.status === 'pendente' && p.vencimento < hoje && p.analise !== 'enviado' && !ehMeu(p));
+  const qtdLembrete = new Set(vencidasLembrete.map((p) => p.pessoaId)).size;
+
   const alunosEscopo = db.alunos.filter((a) => a.status === 'aprovado' && (!filial || a.filialId === filial) && professorVeAluno(db, user, a));
 
   return (
@@ -99,6 +105,7 @@ export default function Financeiro({ user }) {
         )}
         <button className="btn ghost" onClick={() => (rotinaFinanceira(), toast('Cobranças do mês verificadas.'))}>🔁 Gerar cobranças do mês</button>
         <button className="btn ghost" onClick={() => setRetro(true)}>↩ Meses anteriores</button>
+        <button className="btn ok" title="Lembrete WhatsApp para todos com mensalidade vencida" onClick={() => setLembreteGeral(true)}>📲 Lembrete geral{qtdLembrete ? ` (${qtdLembrete})` : ''}</button>
         <button className="btn" onClick={() => setNovo({ tipo: 'mensalidade', pessoaId: '', valor: '', vencimento: hoje, descricao: '' })}>+ Lançamento</button>
       </PageHead>
 
@@ -387,6 +394,16 @@ export default function Financeiro({ user }) {
         )}
       </Modal>
       {confirmEl}
+      <LembreteGeral
+        open={lembreteGeral}
+        onClose={() => setLembreteGeral(false)}
+        vencidos={vencidasLembrete}
+        nomeDe={nomeDe}
+        telDe={telDe}
+        filialDe={(p) => filialNome(db, p.filialId)}
+        chavePix={chaveLembrete}
+        user={user}
+      />
     </>
   );
 }
