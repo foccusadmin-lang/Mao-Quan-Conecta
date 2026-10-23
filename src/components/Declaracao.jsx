@@ -129,9 +129,13 @@ export function DeclaracaoVisual({ d, innerRef }) {
           {/* Espaço flexível: com pouco texto a data fica na posição do modelo; com muito, ela desce junto sem sobrepor */}
           <div style={{ flex: '1 1 auto', minHeight: t(18), maxHeight: t(170) }} />
           <div style={{ alignSelf: 'flex-end', fontSize: t(12), marginRight: t(12) }}>Barueri, {dataPorExtenso()}.</div>
-          <div style={{ flex: '1 1 auto', minHeight: t(36), maxHeight: t(84) }} />
+          <div style={{ flex: '1 1 auto', minHeight: t(52), maxHeight: t(84) }} />
 
           <div style={{ textAlign: 'center', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
+            {/* Assinatura sobre a linha (PNG com fundo transparente) */}
+            <div style={{ position: 'relative', height: 0 }}>
+              <img src="./declaracao/assinatura.png" alt="" style={{ position: 'absolute', left: '50%', bottom: t(-12), width: t(150), transform: 'translateX(-50%)' }} />
+            </div>
             <div style={{ borderTop: `${t(0.8)} solid #111`, width: t(226), margin: `0 auto ${t(8)}` }} />
             Francisco Crizante
             <div style={{ fontStyle: 'italic' }}>Técnico e Gestor</div>
