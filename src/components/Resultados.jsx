@@ -52,6 +52,32 @@ export function paginarResultados(itens = []) {
   return paginas;
 }
 
+/**
+ * Divide os grupos em duas colunas de altura parecida, sem partir um campeonato ao meio.
+ * Feito à mão (e não com CSS columns): as colunas automáticas do navegador sobrepunham textos na imagem/PDF.
+ * Se a 2ª coluna começa no meio de um ano, o ano é repetido no topo dela.
+ */
+function duasColunas(grupos) {
+  const blocos = grupos.flatMap((g) => g.campeonatos.map((c, i) => ({ ano: g.ano, c, primeiro: i === 0 })));
+  const peso = (b) => (b.primeiro ? 1.6 : 0) + 1.3 + b.c.rs.reduce((u, r) => u + 1 + Math.floor(((r.posicao || '').length + (r.prova || '').length) / 34), 0);
+  const total = blocos.reduce((s, b) => s + peso(b), 0);
+  let acc = 0;
+  let corte = blocos.length;
+  for (const [i, b] of blocos.entries()) {
+    if (acc + peso(b) / 2 > total / 2) { corte = i; break; }
+    acc += peso(b);
+  }
+  const agrupa = (lista) => {
+    const out = [];
+    for (const b of lista) {
+      if (!out.length || out.at(-1).ano !== b.ano) out.push({ ano: b.ano, campeonatos: [] });
+      out.at(-1).campeonatos.push(b.c);
+    }
+    return out;
+  };
+  return [agrupa(blocos.slice(0, Math.max(1, corte))), agrupa(blocos.slice(Math.max(1, corte)))];
+}
+
 /** Folha A4 (cqw). pagina/total: numeração quando a relação ocupa mais de uma folha */
 export function ResultadosVisual({ aluno, itens, innerRef, pagina = 1, total = 1, periodoGeral }) {
   const grupos = agruparResultados(itens);
@@ -98,16 +124,20 @@ export function ResultadosVisual({ aluno, itens, innerRef, pagina = 1, total = 1
             <div><b>RG:</b> {aluno.rg ? maskRG(aluno.rg) : 'Não informado'} &nbsp;&nbsp; <b>CPF:</b> {aluno.cpf ? maskCPF(aluno.cpf) : 'Não informado'}</div>
           </div>}
 
-          <div style={{ fontSize: t(fonte), lineHeight: 1.3, marginTop: t(10), columnCount: duas ? 2 : 1, columnGap: t(22), columnFill: 'balance', flex: 'none' }}>
+          <div style={{ fontSize: t(fonte), lineHeight: 1.3, marginTop: t(10), display: 'flex', gap: t(22), alignItems: 'flex-start', flex: 'none' }}>
             {!grupos.length && <div style={{ fontStyle: 'italic' }}>Nenhum resultado registrado.</div>}
-            {grupos.map((g) => (
-              <div key={g.ano} style={{ marginBottom: t(6) }}>
-                <div style={{ fontWeight: 800, color: '#b30600', fontSize: t(fonte + 1.5), breakAfter: 'avoid' }}>{g.ano}</div>
-                {g.campeonatos.map((c) => (
-                  <div key={c.nome} style={{ margin: `${t(2)} 0 ${t(4)}`, breakInside: 'avoid' }}>
-                    <div style={{ fontWeight: 700, fontStyle: 'italic' }}>{c.nome}</div>
-                    {[...c.rs].sort((a, b) => ordemPos(a.posicao) - ordemPos(b.posicao)).map((r) => (
-                      <div key={r.id} style={{ paddingLeft: t(10) }}>• <b>{r.posicao}</b>{r.prova ? ` — ${r.prova}` : ''}</div>
+            {(duas ? duasColunas(grupos) : [grupos]).map((coluna, ci) => (
+              <div key={ci} style={{ flex: '1 1 0', minWidth: 0 }}>
+                {coluna.map((g) => (
+                  <div key={g.ano} style={{ marginBottom: t(6) }}>
+                    <div style={{ fontWeight: 800, color: '#b30600', fontSize: t(fonte + 1.5) }}>{g.ano}</div>
+                    {g.campeonatos.map((c) => (
+                      <div key={c.nome} style={{ margin: `${t(2)} 0 ${t(4)}` }}>
+                        <div style={{ fontWeight: 700, fontStyle: 'italic' }}>{c.nome}</div>
+                        {[...c.rs].sort((a, b) => ordemPos(a.posicao) - ordemPos(b.posicao)).map((r) => (
+                          <div key={r.id} style={{ paddingLeft: t(10), textIndent: t(-7) }}>• <b>{r.posicao}</b>{r.prova ? ` — ${r.prova}` : ''}</div>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 ))}
