@@ -1,5 +1,5 @@
 // Declaração da Associação (atleta filiado à FPKF / CBKW): A4, com os dados do atleta e a data do dia.
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { toJpeg } from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -7,6 +7,7 @@ import { useDB, setDB, modalidadesAluno, DIAS_SEMANA } from '../lib/db';
 import { maskCPF, maskRG } from '../lib/utils';
 import { Card, Field, toast } from './ui';
 import { imprimirImagens } from '../lib/imprimir';
+import { supabase } from '../lib/supabase';
 
 const DIAS = { 1: 'Segunda-feira', 2: 'Terça-feira', 3: 'Quarta-feira', 4: 'Quinta-feira', 5: 'Sexta-feira', 6: 'Sábado', 0: 'Domingo' };
 const ORDEM = [1, 2, 3, 4, 5, 6, 0];
@@ -17,7 +18,31 @@ export const ENTIDADES = {
   maoquan: { razao: 'Associação Mao Quan Kung-fu Wushu', rodape: 'ASSOCIAÇÃO MAO QUAN KUNG FU WUSHU', cnpj: '69.451.196/0001-37' },
   maochuen: { razao: 'Associação Mao Chuen do Brasil, Cultural e Artístico Marcial', rodape: 'ASSOCIAÇÃO MAO CHUEN DO BRASIL, CULTURAL E ARTÍSTICO MARCIAL', cnpj: '02.273.448/0001-04' },
 };
-const W = 1654; // largura da exportação (A4 a 200 dpi)
+const W = 1654;
+
+/**
+ * Assinatura do Mestre: fica no banco (tabela mq_privado), que só ADM e professores conseguem ler.
+ * Não é arquivo público do site, então o aluno não tem como imprimir a declaração assinada.
+ */
+let assinaturaCache;
+export async function carregarAssinatura() {
+  if (assinaturaCache !== undefined) return assinaturaCache;
+  try {
+    const { data } = await supabase.from('mq_privado').select('valor').eq('id', 'assinatura-mestre').maybeSingle();
+    assinaturaCache = data?.valor || null;
+  } catch {
+    assinaturaCache = null;
+  }
+  return assinaturaCache;
+}
+/** undefined = carregando · null = sem assinatura · string = imagem */
+function useAssinatura(equipe) {
+  const [a, setA] = useState(equipe ? assinaturaCache : null);
+  useEffect(() => {
+    if (equipe && a === undefined) carregarAssinatura().then(setA);
+  }, [equipe, a]);
+  return equipe ? a : null;
+} // largura da exportação (A4 a 200 dpi)
 
 /** Horários de treino do atleta a partir da grade da filial (dias + início/fim de cada aula escolhida) */
 function horariosDaGrade(db, a) {
@@ -69,7 +94,7 @@ export function horariosPorDia(horarios = []) {
 }
 
 /** A folha A4 (unidades cqw: tudo escala com a largura). Data e assinatura vêm depois do texto: nunca ficam por baixo dele */
-export function DeclaracaoVisual({ d, innerRef }) {
+export function DeclaracaoVisual({ d, innerRef, assinatura }) {
   const ent = ENTIDADES[d.entidade] || ENTIDADES.maoquan;
   const fem = d.genero === 'f';
   const masc = d.genero === 'm';
@@ -132,10 +157,12 @@ export function DeclaracaoVisual({ d, innerRef }) {
           <div style={{ flex: '1 1 auto', minHeight: t(52), maxHeight: t(84) }} />
 
           <div style={{ textAlign: 'center', fontSize: t(12), lineHeight: 1.3, marginLeft: t(-9) }}>
-            {/* Assinatura sobre a linha (PNG com fundo transparente) */}
-            <div style={{ position: 'relative', height: 0 }}>
-              <img src="./declaracao/assinatura.png" alt="" style={{ position: 'absolute', left: '50%', bottom: t(-12), width: t(150), transform: 'translateX(-50%)' }} />
-            </div>
+            {/* Assinatura do Mestre sobre a linha: só nas declarações geradas pelo ADM ou pelo professor */}
+            {assinatura && (
+              <div style={{ position: 'relative', height: 0 }}>
+                <img src={assinatura} alt="" style={{ position: 'absolute', left: '50%', bottom: t(-16), width: t(150), transform: 'translateX(-50%)' }} />
+              </div>
+            )}
             <div style={{ borderTop: `${t(0.8)} solid #111`, width: t(226), margin: `0 auto ${t(8)}` }} />
             Francisco Crizante
             <div style={{ fontStyle: 'italic' }}>Técnico e Gestor</div>
@@ -175,8 +202,11 @@ export function entregar(imagens, formato, arquivo) {
  * Declarações de vários alunos de uma vez (um PDF com uma página por aluno, ou impressão única).
  * Cada folha é montada fora da tela, convertida em imagem e descartada.
  */
-export const declaracoesEmLote = (db, alunos, formato, aoProgresso) =>
-  documentosEmLote(alunos, (a, ref) => <DeclaracaoVisual d={dadosDeclaracao(db, a)} innerRef={ref} />, formato, 'declaracao', aoProgresso);
+// Só a tela Declarações (ADM / professor) gera em lote: sai com a assinatura do Mestre
+export async function declaracoesEmLote(db, alunos, formato, aoProgresso) {
+  const assinatura = await carregarAssinatura();
+  return documentosEmLote(alunos, (a, ref) => <DeclaracaoVisual d={dadosDeclaracao(db, a)} innerRef={ref} assinatura={assinatura} />, formato, 'declaracao', aoProgresso);
+}
 
 /** Gera um documento A4 por aluno (montado fora da tela) e entrega tudo num PDF ou numa impressão só */
 export async function documentosEmLote(alunos, renderizar, formato, prefixo, aoProgresso) {
@@ -213,6 +243,7 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
   const db = useDB();
   // Só a equipe (tela Declarações, que passa a lista de alunos) escolhe a entidade; o atleta não
   const equipe = !!todos;
+  const assinatura = useAssinatura(equipe);
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState(null);
@@ -284,8 +315,8 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
     <Card title={titulo || '📄 Declaração da Associação (FPKF / CBKW)'}>
       <p className="xs muted" style={{ marginTop: 0 }}>{todos ? 'Preenchida com os dados do aluno.' : 'Preenchida com seus dados.'} A data é sempre a do dia em que você imprime ou baixa.</p>
       <div className="row mb" style={{ gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn sm" disabled={busy} onClick={() => exportar('pdf')}>⬇ Baixar PDF</button>
-        <button className="btn sm ghost" disabled={busy} onClick={() => exportar('print')}>🖨 Imprimir</button>
+        <button className="btn sm" disabled={busy || assinatura === undefined} onClick={() => exportar('pdf')}>⬇ Baixar PDF</button>
+        <button className="btn sm ghost" disabled={busy || assinatura === undefined} onClick={() => exportar('print')}>🖨 Imprimir</button>
         {!edit && <button className="btn sm ghost" onClick={() => setEdit({ ...d, horarios: d.horarios.map((h) => ({ ...h })) })}>✏️ Editar</button>}
       </div>
 
@@ -336,7 +367,7 @@ export function DeclaracaoAtleta({ aluno, todos, titulo }) {
       )}
 
       <div style={{ maxWidth: 620, margin: '0 auto', boxShadow: '0 6px 24px rgba(0,0,0,.12)', borderRadius: 4, overflow: 'hidden' }}>
-        <DeclaracaoVisual d={edit || d} innerRef={ref} />
+        <DeclaracaoVisual d={edit || d} innerRef={ref} assinatura={assinatura} />
       </div>
     </Card>
   );
