@@ -49,7 +49,7 @@ export default function AlunoHome({ user }) {
         <Card title="📈 Minha frequência">
           <div className="row between"><span>Últimos 90 dias</span><b>{fr.pct}%</b></div>
           <div className={`meter ${fr.ok ? '' : 'bad'}`} style={{ margin: '8px 0' }}><i style={{ width: fr.pct + '%' }} /></div>
-          <div className="small muted">Mínimo para exame: {fr.min}% · {fr.presentes} presenças · {fr.faltas} faltas</div>
+          <div className="small muted">Mínimo para exame: {fr.min}% · {fr.presentes} de {fr.previstas} aulas · {fr.faltas} falta{fr.faltas === 1 ? '' : 's'}</div>
           {user.preExame && <div className={`alert ${user.preExame.status === 'apto' ? 'ok' : 'gold'} mt small`}>{user.preExame.status === 'apto' ? '✅ Você está APTO para o próximo exame!' : '💪 Seu professor indicou reforço antes do exame.'}</div>}
         </Card>
         <Card title="🎬 Meu conteúdo" actions={<Link to="conteudo" className="btn sm ghost">Abrir</Link>}>

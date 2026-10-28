@@ -1,4 +1,4 @@
-import { useDB, setDB, frequencia, filiaisDoAluno, filialNome, turnoAgora, nomeTurno, presencaNoTurno, horariosFilial, horarioAgora } from '../../lib/db';
+import { useDB, setDB, frequencia, filiaisDoAluno, filialNome, turnoAgora, nomeTurno, presencaNoTurno, horariosFilial, horarioAgora, ehFalta } from '../../lib/db';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, toast } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
@@ -9,7 +9,8 @@ export function MarcarPresenca({ user }) {
   const filiais = filiaisDoAluno(user);
   const varias = filiais.length > 1;
   const turno = turnoAgora(); // a presença vai para a chamada deste horário (manhã / tarde / noite)
-  const regs = db.presencas.filter((p) => p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno));
+  // Falta lançada pelo professor não é presença (e o aluno ainda pode marcar, se chegou atrasado)
+  const regs = db.presencas.filter((p) => p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno) && !ehFalta(p));
   const confirmada = regs.find((p) => p.confirmada);
   const pendente = regs.find((p) => !p.confirmada);
   const reg = confirmada || pendente;
@@ -27,7 +28,7 @@ export function MarcarPresenca({ user }) {
   const marcar = (filialId) => {
     const horario = horarioDe(filialId);
     setDB((d) => {
-      d.presencas = d.presencas.filter((p) => !(p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno) && !p.confirmada));
+      d.presencas = d.presencas.filter((p) => !(p.alunoId === user.id && p.data === hoje && presencaNoTurno(p, turno) && !p.confirmada && !ehFalta(p)));
       d.presencas.push({ id: uid('pz'), alunoId: user.id, filialId, data: hoje, turno, ...(horario ? { horario } : {}), origem: 'aluno', confirmada: false });
     });
     toast(`Presença registrada${varias ? ' em ' + filialNome(db, filialId) : ''}! Aguarde a confirmação do Laoshi.`);
@@ -69,7 +70,8 @@ export default function AlunoPresenca({ user }) {
         <MarcarPresenca user={user} />
         <Card title={`Frequência: ${fr.pct}%`}>
           <div className={`meter ${fr.ok ? '' : 'bad'}`}><i style={{ width: fr.pct + '%' }} /></div>
-          <p className="small muted">Mínimo exigido para o exame de graduação: {fr.min}% e no máximo {fr.maxFaltas} faltas em 90 dias. Você tem {fr.faltas}.</p>
+          <p className="small" style={{ margin: '8px 0 4px' }}><b>{fr.presentes}</b> de <b>{fr.previstas}</b> aulas{fr.porGrade ? ' dos seus horários' : ''} · <b>{fr.faltas}</b> falta{fr.faltas === 1 ? '' : 's'}{fr.extras ? ` · +${fr.extras} treino${fr.extras === 1 ? '' : 's'} extra` : ''}</p>
+          <p className="small muted">Mínimo exigido para o exame de graduação: {fr.min}% e no máximo {fr.maxFaltas} faltas em 90 dias.</p>
         </Card>
         <Card title="Presenças por mês"><AttendanceChart alunoId={user.id} /></Card>
         <Card title="Últimos registros">
@@ -77,7 +79,7 @@ export default function AlunoPresenca({ user }) {
           {ultimas.map((p) => (
             <div key={p.id} className="list-item">
               <div className="grow">{fmtDate(p.data)}{p.turno && <span className="xs muted"> · {nomeTurno(p.turno)}</span>}{filiaisDoAluno(user).length > 1 && <span className="xs muted"> · {filialNome(db, p.filialId)}</span>}</div>
-              <span className={`badge ${p.confirmada ? 'ok' : 'warn'}`}>{p.confirmada ? 'Confirmada' : 'Aguardando'}</span>
+              {ehFalta(p) ? <span className="badge red">Falta</span> : <span className={`badge ${p.confirmada ? 'ok' : 'warn'}`}>{p.confirmada ? 'Confirmada' : 'Aguardando'}</span>}
             </div>
           ))}
         </Card>

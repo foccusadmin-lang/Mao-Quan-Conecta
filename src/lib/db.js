@@ -653,17 +653,70 @@ export function professorEmDia(prof) {
   return !!prof?.filiacaoValidaAte && prof.filiacaoValidaAte >= todayISO();
 }
 
-/** Frequência dos últimos N dias frente à carga horária da filial */
+/** Registro de falta lançado pelo professor / ADM na chamada (não é presença) */
+export const ehFalta = (p) => !!p?.falta;
+
+/**
+ * Frequência dos últimos N dias.
+ * Com horários escolhidos: cada aula da grade do aluno (em todas as filiais dele) desde o início é uma aula prevista,
+ * e só conta como presente a aula que tem presença confirmada. Várias aulas no mesmo dia contam separadas,
+ * e treino fora dos horários dele aparece como extra (não passa de 100% nem esconde faltas).
+ * Sem horários escolhidos: estimativa pela carga horária da filial (aulas por semana).
+ * Faltas lançadas na chamada sempre entram como faltas.
+ */
 export function frequencia(db, aluno, dias = 90) {
   const filial = db.filiais.find((f) => f.id === aluno.filialId);
-  const inicio = [addDays(todayISO(), -dias), aluno.aprovadoEm || aluno.criadoEm?.slice(0, 10) || todayISO()].sort()[1];
-  const periodo = Math.max(1, diffDays(todayISO(), inicio));
-  const previstas = Math.max(1, Math.round((periodo / 7) * (filial?.aulasSemana || 2)));
-  const presentes = db.presencas.filter((p) => p.alunoId === aluno.id && p.confirmada && p.data >= inicio).length;
-  const faltas = Math.max(0, previstas - presentes);
-  const pct = Math.min(100, Math.round((presentes / previstas) * 100));
-  const ok = pct >= (filial?.minFrequencia ?? 75) && faltas <= (filial?.maxFaltas ?? 99);
-  return { previstas, presentes, faltas, pct, ok, min: filial?.minFrequencia ?? 75, maxFaltas: filial?.maxFaltas ?? 99 };
+  const hoje = todayISO();
+  const inicio = [addDays(hoje, -dias), aluno.aprovadoEm || aluno.criadoEm?.slice(0, 10) || hoje].sort()[1];
+  const min = filial?.minFrequencia ?? 75;
+  const maxFaltas = filial?.maxFaltas ?? 99;
+  const registros = db.presencas.filter((p) => p.alunoId === aluno.id && p.data >= inicio && p.data <= hoje);
+  const confirmadas = registros.filter((p) => p.confirmada && !ehFalta(p));
+  const lancadas = registros.filter(ehFalta);
+
+  const grade = filiaisDoAluno(aluno).flatMap((fid) => (db.filiais.find((f) => f.id === fid)?.horarios || []).map((h) => ({ ...h, filialId: fid })));
+  const meus = grade.filter((h) => aluno.horarios?.includes(h.id));
+
+  if (!meus.length) {
+    const periodo = Math.max(1, diffDays(hoje, inicio));
+    const estimadas = Math.max(1, Math.round((periodo / 7) * (filial?.aulasSemana || 2)));
+    const presentes = confirmadas.length;
+    const previstas = Math.max(estimadas, presentes + lancadas.length);
+    const faltas = Math.max(0, previstas - presentes);
+    const pct = Math.min(100, Math.round((presentes / previstas) * 100));
+    return { previstas, presentes, faltas, faltasLancadas: lancadas.length, extras: 0, pct, ok: pct >= min && faltas <= maxFaltas, min, maxFaltas, porGrade: false };
+  }
+
+  // Aulas previstas: cada dia × cada horário dele naquele dia da semana (as de hoje só depois que terminam)
+  const agora = new Date();
+  const horaAgora = `${String(agora.getHours()).padStart(2, '0')}:${String(agora.getMinutes()).padStart(2, '0')}`;
+  const sessoes = [];
+  for (let d = inicio; d <= hoje; d = addDays(d, 1)) {
+    const dow = diaDaData(d);
+    for (const h of meus) if (horarioNoDia(h, dow) && (d < hoje || h.fim <= horaAgora)) sessoes.push({ data: d, h });
+  }
+  const chave = (data, hid) => data + '|' + hid;
+  const previstasSet = new Set(sessoes.map((s) => chave(s.data, s.h.id)));
+  // Falta lançada num horário que não é da grade dele também é uma aula que ele deveria ter feito
+  for (const p of lancadas) if (p.horario && !previstasSet.has(chave(p.data, p.horario))) (previstasSet.add(chave(p.data, p.horario)), sessoes.push({ data: p.data, h: { id: p.horario } }));
+
+  // Presenças confirmadas: a do próprio horário preenche aquela aula; registros antigos (sem horário) preenchem
+  // uma aula do mesmo dia, filial e período que ainda estiver vazia
+  const feitas = new Set();
+  const usadas = new Set();
+  for (const p of confirmadas) if (p.horario && previstasSet.has(chave(p.data, p.horario))) (feitas.add(chave(p.data, p.horario)), usadas.add(p.id));
+  for (const p of confirmadas) {
+    if (usadas.has(p.id)) continue;
+    if (p.horario) continue; // treino num horário que não é o dele: extra
+    const vaga = sessoes.find((s) => s.data === p.data && !feitas.has(chave(s.data, s.h.id)) && (!s.h.filialId || s.h.filialId === p.filialId) && presencaNoTurno(p, s.h.turno));
+    if (vaga) (feitas.add(chave(vaga.data, vaga.h.id)), usadas.add(p.id));
+  }
+  const previstas = previstasSet.size;
+  const presentes = feitas.size;
+  const extras = confirmadas.filter((p) => !usadas.has(p.id)).length;
+  const faltas = previstas - presentes;
+  const pct = previstas ? Math.round((presentes / previstas) * 100) : 100;
+  return { previstas, presentes, faltas, faltasLancadas: lancadas.length, extras, pct, ok: pct >= min && faltas <= maxFaltas, min, maxFaltas, porGrade: true };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useDB, setDB, frequencia, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, filialNome, TURNOS, nomeTurno, turnoAgora, alunoNoTurno, presencaNoTurno, horariosFilial, horarioAgora, alunoNoHorario, presencaNoHorario, rotuloHorario, diaDaData, DIAS_SEMANA } from '../../lib/db';
+import { useDB, setDB, frequencia, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, filialNome, TURNOS, nomeTurno, turnoAgora, alunoNoTurno, presencaNoTurno, horariosFilial, horarioAgora, alunoNoHorario, presencaNoHorario, rotuloHorario, diaDaData, DIAS_SEMANA, ehFalta } from '../../lib/db';
 import { TurnosBadge, HorariosFilialEditor } from '../../components/Turnos';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field, Search } from '../../components/ui';
@@ -11,6 +11,7 @@ export default function Presenca({ user }) {
   const [tab, setTab] = useState('chamada');
   const [data, setData] = useState(todayISO());
   const [marcados, setMarcados] = useState({});
+  const [faltas, setFaltas] = useState({}); // falta lançada pelo professor / ADM nesta aula
   const [sel, setSel] = useState(null);
   const [trava, setTrava] = useState(null);
   // Horário da chamada: o do professor (se ele dá aula em um só) ou o do momento; '' = todos
@@ -44,12 +45,18 @@ export default function Presenca({ user }) {
   const doDia = db.presencas.filter((p) => p.filialId === filial?.id && p.data === data && meusIds.has(p.alunoId) && presNaSessao(p));
 
   // Sincroniza: pré-marca quem já confirmou pelo app ou chamada anterior
-  const chave = doDia.map((p) => p.alunoId + p.confirmada).join();
+  const chave = doDia.map((p) => p.alunoId + p.confirmada + !!p.falta).join();
   useEffect(() => {
     const m = {};
-    doDia.forEach((p) => (m[p.alunoId] = true));
+    const fa = {};
+    doDia.forEach((p) => (ehFalta(p) ? (fa[p.alunoId] = true) : (m[p.alunoId] = true)));
+    // Presença (mesmo pelo app) vale mais que uma falta antiga da mesma aula
+    Object.keys(m).forEach((id) => delete fa[id]);
     setMarcados(m);
+    setFaltas(fa);
   }, [data, chave, turno, horarioId]);
+  const presente = (id, v) => (setMarcados((m) => ({ ...m, [id]: v })), v && setFaltas((x) => ({ ...x, [id]: false })));
+  const faltou = (id, v) => (setFaltas((x) => ({ ...x, [id]: v })), v && setMarcados((m) => ({ ...m, [id]: false })));
   useEffect(() => {
     if (filial) setTrava({ aulasSemana: filial.aulasSemana, minFrequencia: filial.minFrequencia, maxFaltas: filial.maxFaltas });
   }, [filial?.id]);
@@ -59,7 +66,8 @@ export default function Presenca({ user }) {
   const salvar = () => {
     setDB((d) => {
       // Mexe só na chamada dos próprios alunos (não apaga a de outro professor da mesma filial)
-      d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && meusIds.has(p.alunoId) && presNaSessao(p) && !marcados[p.alunoId]));
+      // (as faltas desta aula sempre saem aqui: são lançadas de novo logo abaixo, só para quem está com falta)
+      d.presencas = d.presencas.filter((p) => !(p.filialId === filial.id && p.data === data && meusIds.has(p.alunoId) && presNaSessao(p) && (!marcados[p.alunoId] || ehFalta(p))));
       for (const a of daChamada) {
         if (!marcados[a.id]) continue;
         // Cada filial tem a sua chamada: a presença de outra filial no mesmo dia não é tocada
@@ -71,12 +79,20 @@ export default function Presenca({ user }) {
           if (horario) ex.horario = horario.id;
         } else d.presencas.push({ id: uid('pz'), alunoId: a.id, filialId: filial.id, data, ...(turno ? { turno } : {}), ...(horario ? { horario: horario.id } : {}), origem: 'professor', confirmada: true });
       }
+      // Faltas: um registro por aluno nesta aula (as anteriores desta aula já saíram no filtro acima)
+      for (const a of daChamada) {
+        if (!faltas[a.id] || marcados[a.id]) continue;
+        d.presencas.push({ id: uid('pz'), alunoId: a.id, filialId: filial.id, data, ...(turno ? { turno } : {}), ...(horario ? { horario: horario.id } : {}), origem: 'professor', confirmada: false, falta: true, lancadaPor: user.nome });
+      }
       notify(d, 'filial:' + filial.id, 'Chamada registrada', `Presenças de ${fmtDate(data)}${rotuloSessao ? ` (${rotuloSessao})` : ''} confirmadas pelo Laoshi.`);
     });
     toast(`Chamada${rotuloSessao ? ' — ' + rotuloSessao : ''} salva.`);
   };
 
-  const pelosAlunos = doDia.filter((p) => p.origem === 'aluno' && !p.confirmada).length;
+  const pelosAlunos = doDia.filter((p) => p.origem === 'aluno' && !p.confirmada && !ehFalta(p)).length;
+  const nPresentes = lista.filter((a) => marcados[a.id]).length;
+  const nFaltas = lista.filter((a) => faltas[a.id] && !marcados[a.id]).length;
+  const semMarcacao = lista.filter((a) => !marcados[a.id] && !faltas[a.id]);
 
   return (
     <>
@@ -91,7 +107,8 @@ export default function Presenca({ user }) {
           actions={
             <>
               <input type="date" value={data} max={todayISO()} onChange={(e) => setData(e.target.value)} style={{ maxWidth: 170 }} />
-              <button className="btn sm ghost" onClick={() => setMarcados({ ...marcados, ...Object.fromEntries(lista.map((a) => [a.id, true])) })}>Marcar todos</button>
+              <button className="btn sm ghost" onClick={() => (setMarcados({ ...marcados, ...Object.fromEntries(lista.map((a) => [a.id, true])) }), setFaltas({}))}>Marcar todos</button>
+              <button className="btn sm ghost" disabled={!semMarcacao.length} title="Lança falta para quem não está marcado como presente" onClick={() => setFaltas({ ...faltas, ...Object.fromEntries(semMarcacao.map((a) => [a.id, true])) })}>✗ Falta nos demais ({semMarcacao.length})</button>
             </>
           }
         >
@@ -121,11 +138,12 @@ export default function Presenca({ user }) {
           {pelosAlunos > 0 && <div className="alert gold mb small">📲 {pelosAlunos} aluno(s) marcaram presença pelo app — já pré-selecionados. Salve para confirmar.</div>}
           {lista.length === 0 && <Empty>{turno ? `Nenhum aluno neste horário (${rotuloSessao}).` : 'Nenhum aluno ativo na filial.'}</Empty>}
           {lista.map((a) => {
-            const p = doDia.find((x) => x.alunoId === a.id);
-            const outra = !p && db.presencas.find((x) => x.alunoId === a.id && x.data === data && x.filialId !== filial.id);
+            const p = doDia.find((x) => x.alunoId === a.id && !ehFalta(x));
+            const outra = !p && db.presencas.find((x) => x.alunoId === a.id && x.data === data && x.filialId !== filial.id && !ehFalta(x));
+            const falta = !!faltas[a.id] && !marcados[a.id];
             return (
-              <label key={a.id} className="list-item check" style={{ alignItems: 'center' }}>
-                <input type="checkbox" checked={!!marcados[a.id]} onChange={(e) => setMarcados({ ...marcados, [a.id]: e.target.checked })} />
+              <label key={a.id} className="list-item check" style={{ alignItems: 'center', background: falta ? 'rgba(225,6,0,.06)' : undefined }}>
+                <input type="checkbox" checked={!!marcados[a.id]} onChange={(e) => presente(a.id, e.target.checked)} />
                 <Avatar src={a.foto} name={a.nome} />
                 <div className="grow">
                   <div style={{ fontWeight: 600 }}>{a.nome} {a.saude?.restricoes && <span title={a.saude.restricoes}>⚕️</span>}</div>
@@ -136,12 +154,21 @@ export default function Presenca({ user }) {
                 {outra && <span className="badge" title="Presença registrada em outra filial nesta data">📍 {filialNome(db, outra.filialId)}</span>}
                 {p?.origem === 'aluno' && <span className="badge gold">via app</span>}
                 {p?.confirmada && <span className="badge ok">confirmada</span>}
+                <button
+                  type="button"
+                  className={`btn sm ${falta ? '' : 'ghost'}`}
+                  style={falta ? { background: 'var(--red)', color: '#fff' } : undefined}
+                  title={falta ? 'Tirar a falta' : 'Lançar falta nesta aula'}
+                  onClick={(e) => (e.preventDefault(), faltou(a.id, !falta))}
+                >
+                  {falta ? '✗ Falta' : 'Falta'}
+                </button>
               </label>
             );
           })}
           {lista.length > 0 && (
             <div className="row end mt">
-              <span className="small muted">{Object.values(marcados).filter(Boolean).length} presentes</span>
+              <span className="small muted">{nPresentes} presente{nPresentes === 1 ? '' : 's'} · {nFaltas} falta{nFaltas === 1 ? '' : 's'}{semMarcacao.length ? ` · ${semMarcacao.length} sem marcação` : ''}</span>
               <button className="btn" onClick={salvar}>Salvar chamada</button>
             </div>
           )}
@@ -156,7 +183,7 @@ export default function Presenca({ user }) {
               return (
                 <button key={a.id} className="list-item" style={{ width: '100%', background: sel === a.id ? 'var(--red-soft)' : 'none', border: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', borderRadius: 8, padding: '10px 6px' }} onClick={() => setSel(a.id)}>
                   <div className="grow">
-                    <div className="row between small"><b>{a.nome}</b><span>{f.pct}% · {f.faltas} faltas</span></div>
+                    <div className="row between small"><b>{a.nome}</b><span>{f.pct}% · {f.presentes}/{f.previstas} aulas · {f.faltas} falta{f.faltas === 1 ? '' : 's'}{f.extras ? ` · +${f.extras} extra` : ''}</span></div>
                     <div className={`meter ${f.ok ? '' : 'bad'}`}><i style={{ width: f.pct + '%' }} /></div>
                   </div>
                 </button>

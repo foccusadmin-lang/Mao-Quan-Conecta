@@ -26,7 +26,7 @@ export default function ProfDashboard({ user }) {
   const alunos = db.alunos.filter((a) => meus(a) && a.status === 'aprovado');
   const pendentes = db.alunos.filter((a) => meus(a) && a.status === 'pendente');
   const bloqueados = alunos.filter((a) => situacaoAluno(db, a).bloqueado);
-  const presHoje = db.presencas.filter((p) => p.filialId === filial.id && p.data === hoje && visivel(p.alunoId));
+  const presHoje = db.presencas.filter((p) => p.filialId === filial.id && p.data === hoje && !p.falta && visivel(p.alunoId));
   const recebido = db.pagamentos.filter((p) => p.filialId === filial.id && visivel(p.pessoaId) && p.status === 'pago' && p.pagoEm?.startsWith(monthISO())).reduce((s, p) => s + +p.valor, 0);
   const aberto = db.pagamentos.filter((p) => p.filialId === filial.id && visivel(p.pessoaId) && p.status === 'pendente').reduce((s, p) => s + +p.valor, 0);
   const baixaFreq = alunos.filter((a) => !frequencia(db, a).ok);
