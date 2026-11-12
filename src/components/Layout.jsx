@@ -73,6 +73,8 @@ export const NAVS = {
   ],
 };
 
+const LOJA_URL = 'https://www.maochuenloja.com.br/';
+
 const ROLE_LABEL = { admin: 'Central Mao · Administrador', professor: 'Painel do Laoshi', aluno: 'Área do Aluno' };
 
 export default function Layout({ user }) {
@@ -121,6 +123,11 @@ export default function Layout({ user }) {
               {label}
             </NavLink>
           ))}
+          {/* Loja oficial (site externo): em todos os painéis, abre em nova aba */}
+          <a href={LOJA_URL} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>
+            <span className="ico">🛒</span>
+            Loja MAO QUAN <span className="xs" style={{ opacity: 0.6, marginLeft: 'auto' }}>↗</span>
+          </a>
         </nav>
         <div className="foot row">
           <Avatar src={user.foto} name={user.nome} />
