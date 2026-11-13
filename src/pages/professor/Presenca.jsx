@@ -4,6 +4,7 @@ import { TurnosBadge, HorariosFilialEditor } from '../../components/Turnos';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field, Search } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
+import { JustificativasEquipe } from '../../components/Justificativas';
 
 export default function Presenca({ user }) {
   const db = useDB();
@@ -89,6 +90,7 @@ export default function Presenca({ user }) {
     toast(`Chamada${rotuloSessao ? ' — ' + rotuloSessao : ''} salva.`);
   };
 
+  const nJust = alunos.reduce((s, a) => s + (a.justificativas || []).filter((j) => j.status === 'pendente').length, 0);
   const pelosAlunos = doDia.filter((p) => p.origem === 'aluno' && !p.confirmada && !ehFalta(p)).length;
   const nPresentes = lista.filter((a) => marcados[a.id]).length;
   const nFaltas = lista.filter((a) => faltas[a.id] && !marcados[a.id]).length;
@@ -99,7 +101,7 @@ export default function Presenca({ user }) {
       <PageHead title="Presença & Trava Mínima" sub={filial.nome}>
         <Search value={q} onChange={setQ} placeholder="Buscar aluno" />
       </PageHead>
-      <Tabs tabs={[['chamada', '✅ Chamada'], ['historico', '📈 Histórico e gráficos'], ['horarios', '🕐 Horários de aula'], ['trava', '🔒 Trava mínima']]} value={tab} onChange={setTab} />
+      <Tabs tabs={[['chamada', '✅ Chamada'], ['justificativas', `📝 Justificativas${nJust ? ` (${nJust})` : ''}`], ['historico', '📈 Histórico e gráficos'], ['horarios', '🕐 Horários de aula'], ['trava', '🔒 Trava mínima']]} value={tab} onChange={setTab} />
 
       {tab === 'chamada' && (
         <Card
@@ -196,6 +198,8 @@ export default function Presenca({ user }) {
           </Card>
         </div>
       )}
+
+      {tab === 'justificativas' && <JustificativasEquipe alunos={alunos} />}
 
       {tab === 'horarios' && <HorariosFilialEditor filial={filial} />}
 

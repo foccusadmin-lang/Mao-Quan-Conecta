@@ -2,6 +2,7 @@ import { useDB, setDB, frequencia, filiaisDoAluno, filialNome, turnoAgora, nomeT
 import { uid, todayISO, fmtDate } from '../../lib/utils';
 import { PageHead, Card, toast } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
+import { MinhasFaltas, SeloJustificativa } from '../../components/Justificativas';
 
 export function MarcarPresenca({ user }) {
   const db = useDB();
@@ -62,6 +63,8 @@ export function MarcarPresenca({ user }) {
 export default function AlunoPresenca({ user }) {
   const db = useDB();
   const fr = frequencia(db, user);
+  const aluno = db.alunos.find((a) => a.id === user.id) || user;
+  const justDe = (p) => (aluno.justificativas || []).find((j) => j.chave === `${p.data}|${p.horario || p.turno || 'dia'}`);
   const ultimas = db.presencas.filter((p) => p.alunoId === user.id).sort((a, b) => b.data.localeCompare(a.data)).slice(0, 20);
   return (
     <>
@@ -70,16 +73,17 @@ export default function AlunoPresenca({ user }) {
         <MarcarPresenca user={user} />
         <Card title={`Frequência: ${fr.pct}%`}>
           <div className={`meter ${fr.ok ? '' : 'bad'}`}><i style={{ width: fr.pct + '%' }} /></div>
-          <p className="small" style={{ margin: '8px 0 4px' }}><b>{fr.presentes}</b> de <b>{fr.previstas}</b> aulas{fr.porGrade ? ' dos seus horários' : ''} · <b>{fr.faltas}</b> falta{fr.faltas === 1 ? '' : 's'}{fr.extras ? ` · +${fr.extras} treino${fr.extras === 1 ? '' : 's'} extra` : ''}</p>
+          <p className="small" style={{ margin: '8px 0 4px' }}><b>{fr.presentes}</b> de <b>{fr.previstas}</b> aulas{fr.porGrade ? ' dos seus horários' : ''} · <b>{fr.faltas}</b> falta{fr.faltas === 1 ? '' : 's'}{fr.extras ? ` · +${fr.extras} treino${fr.extras === 1 ? '' : 's'} extra` : ''}{fr.abonadas ? ` · ${fr.abonadas} abonada${fr.abonadas === 1 ? '' : 's'}` : ''}</p>
           <p className="small muted">Mínimo exigido para o exame de graduação: {fr.min}% e no máximo {fr.maxFaltas} faltas em 90 dias.</p>
         </Card>
         <Card title="Presenças por mês"><AttendanceChart alunoId={user.id} /></Card>
+        <MinhasFaltas user={user} />
         <Card title="Últimos registros">
           {ultimas.length === 0 && <p className="muted">Sem registros.</p>}
           {ultimas.map((p) => (
             <div key={p.id} className="list-item">
               <div className="grow">{fmtDate(p.data)}{p.turno && <span className="xs muted"> · {nomeTurno(p.turno)}</span>}{filiaisDoAluno(user).length > 1 && <span className="xs muted"> · {filialNome(db, p.filialId)}</span>}</div>
-              {ehFalta(p) ? <span className="badge red">Falta</span> : <span className={`badge ${p.confirmada ? 'ok' : 'warn'}`}>{p.confirmada ? 'Confirmada' : 'Aguardando'}</span>}
+              {ehFalta(p) ? (justDe(p) ? <SeloJustificativa j={justDe(p)} /> : <span className="badge red">Falta</span>) : <span className={`badge ${p.confirmada ? 'ok' : 'warn'}`}>{p.confirmada ? 'Confirmada' : 'Aguardando'}</span>}
             </div>
           ))}
         </Card>

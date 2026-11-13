@@ -663,6 +663,8 @@ export const ehFalta = (p) => !!p?.falta;
  * e treino fora dos horários dele aparece como extra (não passa de 100% nem esconde faltas).
  * Sem horários escolhidos: estimativa pela carga horária da filial (aulas por semana).
  * Faltas lançadas na chamada sempre entram como faltas.
+ * Falta com justificativa aceita (abonada) sai da conta: não é falta nem aula prevista.
+ * ausencias: cada aula perdida (mais recente primeiro), para o aluno justificar.
  */
 export function frequencia(db, aluno, dias = 90) {
   const filial = db.filiais.find((f) => f.id === aluno.filialId);
@@ -673,6 +675,8 @@ export function frequencia(db, aluno, dias = 90) {
   const registros = db.presencas.filter((p) => p.alunoId === aluno.id && p.data >= inicio && p.data <= hoje);
   const confirmadas = registros.filter((p) => p.confirmada && !ehFalta(p));
   const lancadas = registros.filter(ehFalta);
+  const justificativas = new Map((aluno.justificativas || []).map((j) => [j.chave, j]));
+  const abonada = (k) => justificativas.get(k)?.status === 'aceita';
 
   const grade = filiaisDoAluno(aluno).flatMap((fid) => (db.filiais.find((f) => f.id === fid)?.horarios || []).map((h) => ({ ...h, filialId: fid })));
   const meus = grade.filter((h) => aluno.horarios?.includes(h.id));
@@ -681,10 +685,15 @@ export function frequencia(db, aluno, dias = 90) {
     const periodo = Math.max(1, diffDays(hoje, inicio));
     const estimadas = Math.max(1, Math.round((periodo / 7) * (filial?.aulasSemana || 2)));
     const presentes = confirmadas.length;
-    const previstas = Math.max(estimadas, presentes + lancadas.length);
+    const ausencias = lancadas
+      .map((p) => ({ chave: `${p.data}|${p.horario || p.turno || 'dia'}`, data: p.data, horario: p.horario || null, turno: p.turno || null, filialId: p.filialId, lancada: true }))
+      .map((x) => ({ ...x, justificativa: justificativas.get(x.chave) || null }))
+      .sort((a, b) => b.data.localeCompare(a.data));
+    const abonadas = ausencias.filter((x) => abonada(x.chave)).length;
+    const previstas = Math.max(1, Math.max(estimadas, presentes + lancadas.length) - abonadas);
     const faltas = Math.max(0, previstas - presentes);
     const pct = Math.min(100, Math.round((presentes / previstas) * 100));
-    return { previstas, presentes, faltas, faltasLancadas: lancadas.length, extras: 0, pct, ok: pct >= min && faltas <= maxFaltas, min, maxFaltas, porGrade: false };
+    return { previstas, presentes, faltas, faltasLancadas: lancadas.length, abonadas, extras: 0, pct, ok: pct >= min && faltas <= maxFaltas, min, maxFaltas, porGrade: false, ausencias };
   }
 
   // Aulas previstas: cada dia × cada horário dele naquele dia da semana (as de hoje só depois que terminam)
@@ -711,12 +720,19 @@ export function frequencia(db, aluno, dias = 90) {
     const vaga = sessoes.find((s) => s.data === p.data && !feitas.has(chave(s.data, s.h.id)) && (!s.h.filialId || s.h.filialId === p.filialId) && presencaNoTurno(p, s.h.turno));
     if (vaga) (feitas.add(chave(vaga.data, vaga.h.id)), usadas.add(p.id));
   }
-  const previstas = previstasSet.size;
+  const lancadaEm = new Set(lancadas.map((p) => chave(p.data, p.horario)));
+  const ausencias = sessoes
+    .filter((s) => !feitas.has(chave(s.data, s.h.id)))
+    .map((s) => ({ chave: chave(s.data, s.h.id), data: s.data, horario: s.h.id, turno: s.h.turno || null, inicio: s.h.inicio, fim: s.h.fim, aula: s.h.aula, filialId: s.h.filialId || lancadas.find((p) => p.data === s.data && p.horario === s.h.id)?.filialId, lancada: lancadaEm.has(chave(s.data, s.h.id)) }))
+    .map((x) => ({ ...x, justificativa: justificativas.get(x.chave) || null }))
+    .sort((a, b) => b.data.localeCompare(a.data) || (b.inicio || '').localeCompare(a.inicio || ''));
+  const abonadas = ausencias.filter((x) => abonada(x.chave)).length;
+  const previstas = previstasSet.size - abonadas;
   const presentes = feitas.size;
   const extras = confirmadas.filter((p) => !usadas.has(p.id)).length;
   const faltas = previstas - presentes;
   const pct = previstas ? Math.round((presentes / previstas) * 100) : 100;
-  return { previstas, presentes, faltas, faltasLancadas: lancadas.length, extras, pct, ok: pct >= min && faltas <= maxFaltas, min, maxFaltas, porGrade: true };
+  return { previstas, presentes, faltas, faltasLancadas: lancadas.length, abonadas, extras, pct, ok: pct >= min && faltas <= maxFaltas, min, maxFaltas, porGrade: true, ausencias };
 }
 
 /**
