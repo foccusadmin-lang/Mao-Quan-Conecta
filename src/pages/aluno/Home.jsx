@@ -50,7 +50,7 @@ export default function AlunoHome({ user }) {
           <div className="row between"><span>Últimos 90 dias</span><b>{fr.pct}%</b></div>
           <div className={`meter ${fr.ok ? '' : 'bad'}`} style={{ margin: '8px 0' }}><i style={{ width: fr.pct + '%' }} /></div>
           <div className="small muted">Mínimo para exame: {fr.min}% · {fr.presentes} de {fr.previstas} aulas · {fr.faltas} falta{fr.faltas === 1 ? '' : 's'}</div>
-          {user.preExame && <div className={`alert ${user.preExame.status === 'apto' ? 'ok' : 'gold'} mt small`}>{user.preExame.status === 'apto' ? '✅ Você está APTO para o próximo exame!' : '💪 Seu professor indicou reforço antes do exame.'}</div>}
+          {user.preExame && <div className={`alert ${user.preExame.status === 'apto' ? 'ok' : user.preExame.status === 'nao_apto' ? 'red' : 'gold'} mt small`}>{user.preExame.status === 'apto' ? '✅ Você está APTO para o próximo exame!' : user.preExame.status === 'nao_apto' ? 'Você ainda não está apto para este exame — converse com seu professor.' : '💪 Seu professor indicou reforço antes do exame.'}</div>}
         </Card>
         <Card title="🎬 Meu conteúdo" actions={<Link to="conteudo" className="btn sm ghost">Abrir</Link>}>
           <p style={{ margin: 0 }}>{materiais} materiais liberados — sua faixa e as anteriores.</p>

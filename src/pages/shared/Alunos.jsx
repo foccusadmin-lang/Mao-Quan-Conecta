@@ -590,7 +590,7 @@ function FichaA4({ a, fr }) {
         <h4>Frequência e evolução</h4>
         <div className="kv">
           <div><b>Frequência (90 dias):</b> {fr.pct}% ({fr.presentes} de {fr.previstas} aulas / {fr.faltas} faltas)</div>
-          <div><b>Pré-exame:</b> {a.preExame ? (a.preExame.status === 'apto' ? 'Apto' : 'Necessita reforço') : '—'}</div>
+          <div><b>Pré-exame:</b> {a.preExame ? ({ apto: 'Apto', reforco: 'Necessita reforço', nao_apto: 'Não apto' }[a.preExame.status] || '—') : '—'}</div>
         </div>
         {a.tecnico.slice(0, 3).map((t, i) => (
           <div key={i} className="small" style={{ marginTop: 4 }}>• {fmtDate(t.data)} — Téc. {t.desempenho}/5 · Disc. {t.disciplina}/5 · Wu De {t.wude}/5 — {t.obs}</div>

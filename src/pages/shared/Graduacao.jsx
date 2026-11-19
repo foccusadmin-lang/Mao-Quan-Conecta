@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDB, setDB, notify, professorVeAluno, situacaoAluno, frequencia, filialNome, taxaExameFaixa } from '../../lib/db';
 import { uid, todayISO, addDays, fmtDate, brl } from '../../lib/utils';
-import { PageHead, Card, Avatar, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search } from '../../components/ui';
+import { PageHead, Card, Avatar, Faixa, Tabs, useConfirm, toast, Empty, Search } from '../../components/ui';
 
 export default function Graduacao({ user }) {
   const db = useDB();
@@ -14,12 +14,30 @@ export default function Graduacao({ user }) {
 
   const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin || (a.filialId === user.filialId && professorVeAluno(db, user, a))) && (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.nome.localeCompare(b.nome));
 
-  const avaliar = (a, status) =>
+  // Pré-avaliação: apto / necessita reforço / não apto. status null = remove a avaliação
+  const AVISO = {
+    apto: ['Pré-avaliação: APTO ✅', 'Você foi considerado apto para o próximo exame de graduação.'],
+    reforco: ['Pré-avaliação: necessita reforço', 'Continue treinando! Seu professor indicou pontos de reforço antes do exame.'],
+    nao_apto: ['Pré-avaliação: ainda não apto', 'Você ainda não está apto para este exame. Converse com seu professor sobre os próximos passos.'],
+  };
+  const avaliar = (a, status) => {
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === a.id);
+      if (!status) {
+        x.preExame = null;
+        return;
+      }
       x.preExame = { status, por: user.nome, data: new Date().toISOString() };
-      notify(d, a.id, status === 'apto' ? 'Pré-avaliação: APTO ✅' : 'Pré-avaliação: necessita reforço', status === 'apto' ? 'Você foi considerado apto para o próximo exame de graduação.' : 'Continue treinando! Seu professor indicou pontos de reforço antes do exame.');
+      notify(d, a.id, ...AVISO[status]);
     });
+    toast(status ? `${a.nome.split(' ')[0]}: ${AVISO[status][0].replace('Pré-avaliação: ', '')}` : 'Avaliação removida.');
+  };
+  // Apto com trava (frequência / inadimplência): o professor vê o motivo; a Central pode liberar mesmo assim
+  const marcarApto = (a, bloqueios) => {
+    if (!bloqueios.length) return avaliar(a, 'apto');
+    if (!isAdmin) return toast(`Não dá para marcar Apto: ${bloqueios.join(' e ')}.`);
+    ask(`${a.nome} está com trava (${bloqueios.join(' e ')}). Marcar como APTO mesmo assim?`, () => avaliar(a, 'apto'), 'Marcar apto');
+  };
 
   const gerarTaxa = (a) => {
     setDB((d) => {
@@ -76,10 +94,33 @@ export default function Graduacao({ user }) {
                   {bloqueios.length > 0 && <div className="xs" style={{ color: 'var(--red)' }}>⛔ Trava: {bloqueios.join(', ')}</div>}
                 </div>
                 <div className="row">
-                  {a.preExame && <StatusBadge status={a.preExame.status} />}
                   {a.inscritoExame && <span className="badge ink">Inscrito</span>}
-                  <button className="btn sm ok" disabled={bloqueios.length > 0} onClick={() => avaliar(a, 'apto')}>Apto</button>
-                  <button className="btn sm ghost" onClick={() => avaliar(a, 'reforco')}>Necessita reforço</button>
+                  {/* Escolha única: a opção marcada fica destacada; tocar de novo nela (ou em ✕) remove a avaliação */}
+                  <div className="row" role="radiogroup" aria-label={`Pré-avaliação de ${a.nome}`} style={{ gap: 4, flexWrap: 'nowrap' }}>
+                    {[
+                      ['apto', '✅ Apto', 'var(--ok, #1a8f4a)'],
+                      ['reforco', '⚠️ Necessita reforço', '#b45309'],
+                      ['nao_apto', '✗ Não apto', 'var(--red)'],
+                    ].map(([st, rot, cor]) => {
+                      const sel = a.preExame?.status === st;
+                      const travado = st === 'apto' && bloqueios.length > 0 && !sel;
+                      return (
+                        <button
+                          key={st}
+                          type="button"
+                          role="radio"
+                          aria-checked={sel}
+                          className="btn sm"
+                          title={sel ? 'Toque de novo para remover' : travado ? `Trava: ${bloqueios.join(', ')}` : ''}
+                          style={sel ? { background: cor, borderColor: cor, color: '#fff' } : { background: 'transparent', borderColor: 'var(--line, #ddd)', color: travado ? '#999' : cor }}
+                          onClick={() => (sel ? avaliar(a, null) : st === 'apto' ? marcarApto(a, bloqueios) : avaliar(a, st))}
+                        >
+                          {travado ? '🔒 Apto' : rot}
+                        </button>
+                      );
+                    })}
+                    {a.preExame && <button type="button" className="btn sm ghost" title="Remover avaliação" aria-label="Remover avaliação" onClick={() => avaliar(a, null)}>✕</button>}
+                  </div>
                   {a.preExame?.status === 'apto' && !taxa && !a.inscritoExame && bloqueios.length === 0 && (
                     <button className="btn sm dark" onClick={() => gerarTaxa(a)}>Gerar taxa · {brl(taxaExameFaixa(db, a.faixaIdx + 1))}</button>
                   )}

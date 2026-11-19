@@ -398,6 +398,7 @@ export function StatusBadge({ status }) {
     recusado: ['red', 'Recusado'],
     apto: ['ok', 'Apto'],
     reforco: ['warn', 'Necessita reforço'],
+    nao_apto: ['red', 'Não apto'],
   };
   const [tone, label] = map[status] || ['', status];
   return <span className={`badge ${tone}`}>{label}</span>;
