@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDB, setDB, frequencia, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, filialNome, TURNOS, nomeTurno, turnoAgora, alunoNoTurno, presencaNoTurno, horariosFilial, horarioAgora, alunoNoHorario, presencaNoHorario, rotuloHorario, diaDaData, DIAS_SEMANA, ehFalta } from '../../lib/db';
 import { TurnosBadge, HorariosFilialEditor } from '../../components/Turnos';
 import { uid, todayISO, fmtDate } from '../../lib/utils';
-import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field, Search } from '../../components/ui';
+import { PageHead, Card, Avatar, Faixa, Tabs, toast, Empty, Field, Search, useAutoSalvar, BarraSalvar } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
 import { JustificativasEquipe } from '../../components/Justificativas';
 
@@ -61,6 +61,8 @@ export default function Presenca({ user }) {
   useEffect(() => {
     if (filial) setTrava({ aulasSemana: filial.aulasSemana, minFrequencia: filial.minFrequencia, maxFaltas: filial.maxFaltas });
   }, [filial?.id]);
+  // Trava mínima: salva sozinha 3 s depois de alterar
+  const [estadoTrava, salvarTrava] = useAutoSalvar(trava, () => setDB((d) => Object.assign(d.filiais.find((x) => x.id === filial.id), trava)));
 
   if (!filial) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial.</Empty>;
 
@@ -211,9 +213,7 @@ export default function Presenca({ user }) {
             <Field label="Frequência mínima (%)"><input type="number" min="0" max="100" value={trava.minFrequencia} onChange={(e) => setTrava({ ...trava, minFrequencia: +e.target.value })} /></Field>
             <Field label="Limite de faltas (90 dias)"><input type="number" min="0" value={trava.maxFaltas} onChange={(e) => setTrava({ ...trava, maxFaltas: +e.target.value })} /></Field>
           </div>
-          <div className="row end mt">
-            <button className="btn" onClick={() => (setDB((d) => Object.assign(d.filiais.find((f) => f.id === filial.id), trava)), toast('Trava atualizada.'))}>Salvar trava</button>
-          </div>
+          <BarraSalvar estado={estadoTrava} onSalvar={() => (salvarTrava(), toast('Trava atualizada.'))} />
         </Card>
       )}
     </>

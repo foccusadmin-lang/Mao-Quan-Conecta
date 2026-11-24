@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useSyncExternalStore } from 'react';
+﻿import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { initials, readImage } from '../lib/utils';
 import { useDB, nivelsModalidade } from '../lib/db';
 
@@ -35,6 +35,62 @@ export function Stat({ label, value, icon, tone = 'red', hint }) {
       <div className="v">{value}</div>
       <div className="l">{label}</div>
       {hint && <div className="xs muted" style={{ marginTop: 4 }}>{hint}</div>}
+    </div>
+  );
+}
+
+/**
+ * Salvamento automático de formulários com rascunho local: salva `atraso` ms depois da última alteração
+ * (e ao sair da página, se ficou algo pendente). O primeiro valor recebido é a base: não conta como alteração.
+ * Retorna [estado, salvarAgora]; estado = 'salvo' | 'pendente'. Se `salvar` retornar false, nada foi gravado (continua pendente).
+ */
+export function useAutoSalvar(dados, salvar, atraso = 3000) {
+  const chave = dados == null ? null : JSON.stringify(dados);
+  const base = useRef(chave);
+  const ref = useRef(salvar);
+  ref.current = salvar;
+  const [estado, setEstado] = useState('salvo');
+  const pendente = useRef(false);
+  if (base.current == null && chave != null) base.current = chave;
+  const gravar = () => {
+    if (ref.current() === false) return; // dados ainda incompletos/ inválidos: continua pendente
+    base.current = chave;
+    pendente.current = false;
+    setEstado('salvo');
+  };
+  useEffect(() => {
+    if (chave == null || chave === base.current) {
+      pendente.current = false;
+      setEstado('salvo');
+      return;
+    }
+    pendente.current = true;
+    setEstado('pendente');
+    const t = setTimeout(gravar, atraso);
+    return () => clearTimeout(t);
+  }, [chave]);
+  // Saiu da página antes dos 3 s: salva do mesmo jeito
+  useEffect(() => () => pendente.current && ref.current(), []);
+  return [estado, gravar];
+}
+
+/** Barra fixa no rodapé: "Alterações não salvas — salvando em 3 s" / "✓ Tudo salvo", com o botão Salvar agora */
+export function BarraSalvar({ estado, onSalvar, segundos = 3 }) {
+  const pend = estado === 'pendente';
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'sticky', bottom: 12, zIndex: 20, margin: '16px auto 0', maxWidth: 560, display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 14px', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,.15)',
+        background: pend ? '#fff7e6' : '#eaf7ef', border: `1px solid ${pend ? '#f0c36d' : '#9fd8b3'}`, color: '#222',
+      }}
+    >
+      <span className="grow small" style={{ fontWeight: 600 }}>
+        {pend ? `✏️ Alterações não salvas — salvando automaticamente em ${segundos} s…` : '✓ Tudo salvo'}
+      </span>
+      <button type="button" className="btn sm" disabled={!pend} onClick={onSalvar}>Salvar agora</button>
     </div>
   );
 }

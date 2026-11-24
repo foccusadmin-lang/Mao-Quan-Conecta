@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useDB, setDB, TURNOS, nomeTurno, horariosFilial, rotuloHorario, turnoDoHorario, DIAS_SEMANA, textoDias } from '../lib/db';
 import { uid } from '../lib/utils';
-import { Card, toast } from './ui';
+import { Card, toast, useAutoSalvar, BarraSalvar } from './ui';
 
 /** Escolha dos horários de treino (manhã / tarde / noite) — um ou mais */
 export function TurnosInput({ value = [], onChange, disabled }) {
@@ -114,8 +114,9 @@ export function HorariosFilialEditor({ filial }) {
       if (lista.length) f.horarios = lista;
       else delete f.horarios;
     });
-    toast('Horários de aula salvos.');
   };
+  // Salva sozinho 3 s depois de adicionar, renomear ou remover um horário
+  const [estado, salvarAgora] = useAutoSalvar({ filialId: filial.id, lista }, salvar);
 
   return (
     <Card title={`🕐 Horários de aula — ${filial.nome}`}>
@@ -157,7 +158,7 @@ export function HorariosFilialEditor({ filial }) {
         <button type="button" className="btn ghost" onClick={adicionar}>+ Adicionar horário</button>
       </div>
       <div className="xs muted mt">O período (manhã, tarde ou noite) é definido pelo horário de início: antes das 12h, até as 18h, ou depois.</div>
-      <div className="row end mt"><button type="button" className="btn" onClick={salvar}>Salvar horários</button></div>
+      <BarraSalvar estado={estado} onSalvar={() => (salvarAgora(), toast('Horários de aula salvos.'))} />
     </Card>
   );
 }

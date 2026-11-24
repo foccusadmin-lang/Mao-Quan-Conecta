@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { useDB, setDB, replaceDB, DEPARTAMENTOS_PADRAO } from '../../lib/db';
 import { uid, brl } from '../../lib/utils';
-import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo } from '../../components/ui';
+import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo, useAutoSalvar, BarraSalvar } from '../../components/ui';
 import { FAIXAS_PADRAO, NIVEIS, TAXAS_EXAME_2026, GRAD_MODALIDADES_PADRAO } from '../../lib/seed';
 import { PixBox } from '../../components/shared';
 
@@ -13,8 +13,9 @@ export default function Config() {
     const limpo = { ...c };
     if (c.gradModalidades) limpo.gradModalidades = c.gradModalidades.filter((t) => t.modalidade?.trim()).map((t) => ({ ...t, modalidade: t.modalidade.trim(), niveis: t.niveis.map((n) => n.trim()).filter(Boolean) }));
     setDB((d) => (d.config = { ...d.config, ...limpo }));
-    toast('Configurações salvas.');
   };
+  // Salva sozinho 3 s depois da última alteração (ou na hora, pelo botão)
+  const [estado, salvarAgora] = useAutoSalvar(c, salvar);
 
   const exportar = () => {
     const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
@@ -40,7 +41,7 @@ export default function Config() {
   return (
     <>
       <PageHead title="Configurações" sub="Investimento, PIX, cobrança automática, acessos e faixas">
-        <button className="btn" onClick={salvar}>Salvar configurações</button>
+        <button className="btn" disabled={estado !== 'pendente'} onClick={() => (salvarAgora(), toast('Configurações salvas.'))}>{estado === 'pendente' ? 'Salvar configurações' : '✓ Salvo'}</button>
       </PageHead>
 
       <div className="grid g2">
@@ -210,6 +211,7 @@ export default function Config() {
           </div>
         </Card>
       </div>
+      <BarraSalvar estado={estado} onSalvar={salvarAgora} />
       {confirmEl}
     </>
   );

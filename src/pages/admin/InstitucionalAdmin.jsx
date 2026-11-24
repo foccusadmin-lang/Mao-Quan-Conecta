@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDB, setDB } from '../../lib/db';
-import { PageHead, Card, Field, toast } from '../../components/ui';
+import { PageHead, Card, Field, toast, useAutoSalvar, BarraSalvar } from '../../components/ui';
 import { Institucional } from '../../components/shared';
 
 export default function InstitucionalAdmin() {
@@ -27,12 +27,14 @@ export default function InstitucionalAdmin() {
         }),
       };
     });
-    toast('Conteúdo institucional salvo.');
   };
+  // Salva sozinho 3 s depois da última alteração
+  const [estado, salvarAgora] = useAutoSalvar(f, salvar);
+  const manual = () => (salvarAgora(), toast('Conteúdo institucional salvo.'));
   return (
     <>
       <PageHead title="Institucional" sub="Linhagem (Linji), história do estilo, biografia do Mestre e Wu De">
-        <button className="btn" onClick={salvar}>Salvar</button>
+        <button className="btn" disabled={estado !== 'pendente'} onClick={manual}>{estado === 'pendente' ? 'Salvar' : '✓ Salvo'}</button>
       </PageHead>
       <Card>
         <div className="form-grid">
@@ -46,6 +48,7 @@ export default function InstitucionalAdmin() {
           </Field>
         </div>
       </Card>
+      <BarraSalvar estado={estado} onSalvar={manual} />
       <h3 className="mt">Pré-visualização</h3>
       <Institucional />
     </>

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDB, setDB, notify, professorVeAluno, alunoNaFilial, filialExtraDoAluno, situacaoAluno, frequencia, filialNome, faixaNome, gradModalidades, promoverAProfessor, RECURSOS_PROF, recursosPadrao, liberarAluno, perfilDoEmail, mensalidadeDoAluno } from '../../lib/db';
 import { fmtDate, todayISO, brl, maskCPF, maskRG, maskTelefone } from '../../lib/utils';
-import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade } from '../../components/ui';
+import { PageHead, Card, Modal, Field, Inp, Avatar, PhotoInput, Faixa, Tabs, StatusBadge, useConfirm, toast, Empty, Search, FaixaOptions, NiveisModalidade, useAutoSalvar } from '../../components/ui';
 import { AttendanceChart } from '../../components/shared';
 import { EscolhaPlano, salvarPlanoAluno, DiaVencimento, ValorMensalidade } from '../../components/Planos';
 import { CobrancaRetroativa } from '../../components/CobrancaRetroativa';
@@ -256,6 +256,11 @@ function AlunoModal({ id, user, onClose, ask }) {
   const a = db.alunos.find((x) => x.id === id);
   const [tab, setTab] = useState('cadastro');
   const [f, setF] = useState(() => structuredClone(a));
+  const baseFicha = useRef(null);
+  if (!baseFicha.current && a) baseFicha.current = structuredClone(a); // como a ficha estava ao abrir (ou no último salvamento)
+  // Salvamento automático 3 s depois da última alteração (sem a graduação, que pede confirmação no botão Salvar)
+  const gravarRef = useRef(null);
+  const [estadoFicha, marcarFichaSalva] = useAutoSalvar({ ...f, faixaIdx: undefined }, () => gravarRef.current?.(false));
   const [nota, setNota] = useState({ desempenho: 3, disciplina: 3, wude: 3, obs: '' });
   const [promo, setPromo] = useState(null);
   const [retro, setRetro] = useState(false);
@@ -265,13 +270,22 @@ function AlunoModal({ id, user, onClose, ask }) {
   const fin = situacaoAluno(db, a);
   const fr = frequencia(db, a);
 
-  const gravar = () => {
+  // Grava só os campos alterados nesta ficha (nada do que outras abas ou o servidor mudaram nesse meio-tempo é desfeito).
+  // comFaixa = false (salvamento automático): a correção de graduação espera a confirmação no botão Salvar.
+  const gravar = (comFaixa = true) => {
+    const ref = baseFicha.current;
+    const mudados = [...new Set([...Object.keys(f), ...Object.keys(ref)])].filter((k) => JSON.stringify(f[k]) !== JSON.stringify(ref[k]));
+    const NAO_DA_FICHA = ['gradModalidades', 'fotoDefinida', 'faixaIdx', 'tecnico', 'historicoGraduacao', 'inscritoExame', 'plano', 'isentoPor', 'isentoMotivo', 'justificativas', 'mensalidadePersonalizada', 'historicoMensalidade'];
     setDB((d) => {
       const x = d.alunos.find((y) => y.id === id);
       const antes = x.atleta?.ativo;
       if ((f.foto || null) !== (x.foto || null)) x.fotoDefinida = true; // não volta a ser a foto do Google
       const gradAntes = { ...(x.gradModalidades || {}) };
-      Object.assign(x, { ...f, gradModalidades: x.gradModalidades, fotoDefinida: x.fotoDefinida, faixaIdx: x.faixaIdx, tecnico: x.tecnico, historicoGraduacao: x.historicoGraduacao, inscritoExame: x.inscritoExame, plano: x.plano, isentoPor: x.isentoPor, isentoMotivo: x.isentoMotivo, isento: x.isentoPor ? x.isento : f.isento });
+      for (const k of mudados) {
+        if (NAO_DA_FICHA.includes(k) || (k === 'isento' && x.isentoPor)) continue;
+        if (f[k] === undefined) delete x[k];
+        else x[k] = structuredClone(f[k]);
+      }
       if (!x.plano) delete x.plano;
       if (!x.isentoPor) (delete x.isentoPor, delete x.isentoMotivo);
       if (!x.fotoCarteirinha) delete x.fotoCarteirinha; // removida: volta a usar a foto do perfil
@@ -279,7 +293,7 @@ function AlunoModal({ id, user, onClose, ask }) {
       if (!x.horarios?.length) delete x.horarios;
       x.filiaisExtras = limparExtras(x.filialId, f.filiaisExtras);
       if (!x.filiaisExtras.length) delete x.filiaisExtras;
-      if (podeGraduar) corrigirGraduacao(d, id, f.faixaIdx, user);
+      if (podeGraduar && comFaixa) corrigirGraduacao(d, id, f.faixaIdx, user);
       // Graduações por modalidade (TCQ, Sanda…): registra no histórico e avisa o aluno
       if (podeGraduar) {
         for (const t of gradModalidades(d)) {
@@ -293,12 +307,14 @@ function AlunoModal({ id, user, onClose, ask }) {
       }
       if (!antes && f.atleta?.ativo) notify(d, id, 'Você foi convocado(a) como Atleta 🏆', `Polo: ${f.atleta.polo || '—'}. Acesse a aba Atleta e assine o termo.`);
     });
-    toast('Aluno salvo.');
+    baseFicha.current = structuredClone({ ...f, faixaIdx: comFaixa ? f.faixaIdx : ref.faixaIdx });
   };
   const salvar = () =>
     podeGraduar && f.faixaIdx !== a.faixaIdx
-      ? ask(`Corrigir a graduação de ${a.nome} de ${faixaNome(db, a.faixaIdx)} para ${faixaNome(db, f.faixaIdx)}? A alteração fica registrada no histórico.`, gravar, 'Corrigir graduação')
-      : gravar();
+      ? ask(`Corrigir a graduação de ${a.nome} de ${faixaNome(db, a.faixaIdx)} para ${faixaNome(db, f.faixaIdx)}? A alteração fica registrada no histórico.`, () => (gravar(true), marcarFichaSalva(), toast('Aluno salvo.')), 'Corrigir graduação')
+      : (gravar(true), marcarFichaSalva(), toast('Aluno salvo.'));
+  gravarRef.current = gravar;
+  const faixaPendente = podeGraduar && f.faixaIdx !== a.faixaIdx;
   const addNota = () => {
     if (!nota.obs.trim()) return toast('Escreva uma observação.');
     setDB((d) => d.alunos.find((y) => y.id === id).tecnico.unshift({ ...nota, data: new Date().toISOString(), autor: user.nome }));
@@ -317,7 +333,11 @@ function AlunoModal({ id, user, onClose, ask }) {
         <>
           {isAdmin && <button className="btn ghost" style={{ color: 'var(--red)', marginRight: 'auto' }} onClick={() => ask(`Excluir ${a.nome} definitivamente?`, () => (setDB((d) => { d.alunos = d.alunos.filter((y) => y.id !== id); }), onClose()), 'Excluir')}>Excluir</button>}
           <button className="btn ghost" onClick={() => (setTab('ficha'), setTimeout(() => window.print(), 150))}>🖨 Ficha A4</button>
-          {['cadastro', 'saude'].includes(tab) && <button className="btn" onClick={salvar}>Salvar</button>}
+          {(['cadastro', 'saude'].includes(tab) || estadoFicha === 'pendente' || faixaPendente) && (
+            <button className="btn" disabled={estadoFicha !== 'pendente' && !faixaPendente} onClick={salvar}>
+              {faixaPendente ? 'Salvar e confirmar graduação' : estadoFicha === 'pendente' ? 'Salvar agora' : '✓ Salvo'}
+            </button>
+          )}
         </>
       }
     >

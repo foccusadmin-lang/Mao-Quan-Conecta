@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useDB, setDB, setSession, filialNome, notify } from '../../lib/db';
-import { PageHead, Card, toast } from '../../components/ui';
+import { PageHead, Card, toast, useAutoSalvar, BarraSalvar } from '../../components/ui';
 import { CamposDadosPessoais, alteracoesImportantes, validarDados, enderecoVazio } from '../../components/DadosPessoais';
 import { MinhaChavePix } from '../../components/ChavePix';
 
@@ -14,9 +14,10 @@ export default function ProfMeusDados({ user }) {
     endereco: { ...enderecoVazio(), ...(eu.endereco || {}) },
   }));
 
-  const salvar = () => {
+  // automatico = salvamento 3 s depois de alterar: com dado incompleto (ex.: CPF pela metade) só espera, sem aviso
+  const salvar = (automatico) => {
     const erro = validarDados(f);
-    if (erro) return toast(erro);
+    if (erro) return automatico ? false : (toast(erro), false);
     const dados = { ...f, nome: f.nome.trim().replace(/\s+/g, ' ') };
     if ((f.foto || null) !== (eu.foto || null)) dados.fotoDefinida = true; // não volta a ser a foto do Google
     const mudou = alteracoesImportantes(eu, dados);
@@ -31,6 +32,13 @@ export default function ProfMeusDados({ user }) {
       }
       if (mudou.length) notify(d, 'admin', 'Professor atualizou o cadastro', `${dados.nome} (${filialNome(d, eu.filialId)}) atualizou: ${mudou.join(', ')}.`);
     });
+    if (!automatico) toast('Dados atualizados.');
+  };
+  const [estado, salvarAgora] = useAutoSalvar(f, () => salvar(true));
+  const manual = () => {
+    const erro = validarDados(f);
+    if (erro) return toast(erro);
+    salvarAgora();
     toast('Dados atualizados.');
   };
 
@@ -38,16 +46,17 @@ export default function ProfMeusDados({ user }) {
     <>
       <PageHead title="Meus Dados" sub={`${eu.titulo || 'Laoshi'} · ${filialNome(db, eu.filialId)}`}>
         <button className="btn ghost" onClick={() => setSession(null)}>Sair</button>
-        <button className="btn" onClick={salvar}>Salvar</button>
+        <button className="btn" onClick={manual}>Salvar</button>
       </PageHead>
       <div className="grid g2">
         <Card title="📝 Dados cadastrais">
           <CamposDadosPessoais f={f} setF={setF} email={eu.email} />
           <p className="xs muted">Título, graduação, filial e recursos do painel são definidos pela Central.</p>
-          <button className="btn" onClick={salvar}>Salvar alterações</button>
+          <button className="btn" onClick={manual}>Salvar alterações</button>
         </Card>
         <MinhaChavePix user={user} />
       </div>
+      <BarraSalvar estado={estado} onSalvar={manual} />
     </>
   );
 }
