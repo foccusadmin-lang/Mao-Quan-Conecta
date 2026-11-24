@@ -9,10 +9,14 @@ export default function Graduacao({ user }) {
   const [tab, setTab] = useState('avaliar');
   const [q, setQ] = useState('');
   const [ask, confirmEl] = useConfirm();
+  const [filial, setFilial] = useState(''); // ADM: filtrar por filial
+  const [faixaLote, setFaixaLote] = useState(''); // '' = todas as graduações
+  const proximoExame = db.eventos.filter((e) => e.tipo === 'exame' && e.data >= todayISO()).sort((a, b) => a.data.localeCompare(b.data))[0];
+  const [vencimento, setVencimento] = useState(() => (proximoExame ? [addDays(proximoExame.data, -2), todayISO()].sort()[1] : addDays(todayISO(), 7)));
 
   if (!isAdmin && !user.filialId) return <Empty icon="🏯">Você ainda não foi vinculado a uma filial.</Empty>;
 
-  const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin || (a.filialId === user.filialId && professorVeAluno(db, user, a))) && (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.nome.localeCompare(b.nome));
+  const alunos = db.alunos.filter((a) => a.status === 'aprovado' && (isAdmin ? !filial || a.filialId === filial : a.filialId === user.filialId && professorVeAluno(db, user, a)) && (a.nome + ' ' + (a.matricula || '')).toLowerCase().includes(q.toLowerCase())).sort((a, b) => a.nome.localeCompare(b.nome));
 
   // Pré-avaliação: apto / necessita reforço / não apto. status null = remove a avaliação
   const AVISO = {
@@ -39,17 +43,47 @@ export default function Graduacao({ user }) {
     ask(`${a.nome} está com trava (${bloqueios.join(' e ')}). Marcar como APTO mesmo assim?`, () => avaliar(a, 'apto'), 'Marcar apto');
   };
 
-  const gerarTaxa = (a) => {
+  // Taxa de exame: liberada pelo professor ou pela Central a qualquer momento (independe de estar apto)
+  const proxima = (a) => db.config.faixas[a.faixaIdx + 1];
+  const taxaDe = (a) => db.pagamentos.find((p) => p.pessoaId === a.id && p.tipo === 'exame' && p.status !== 'cancelado' && (p.descricao || '').includes(proxima(a)?.nome || '—'));
+  const podeLiberar = (a) => !!proxima(a) && !taxaDe(a);
+  const liberarTaxas = (lista) => {
+    const alvo = lista.filter(podeLiberar);
+    if (!alvo.length) return toast('Todos já estão com a taxa liberada.');
+    const agora = new Date().toISOString();
     setDB((d) => {
-      d.pagamentos.push({
-        id: uid('pg'), tipo: 'exame', pessoaId: a.id, filialId: a.filialId, competencia: todayISO().slice(0, 7),
-        descricao: `Taxa de exame — ${d.config.faixas[a.faixaIdx + 1]?.nome || 'graduação'}`, valor: taxaExameFaixa(d, a.faixaIdx + 1),
-        vencimento: addDays(todayISO(), 7), status: 'pendente', criadoEm: new Date().toISOString(), lembretes: [],
-      });
-      notify(d, a.id, 'Taxa de exame gerada', 'Acesse Pagamentos para quitar a taxa e confirmar sua inscrição no exame.');
+      for (const a of alvo) {
+        const nome = d.config.faixas[a.faixaIdx + 1]?.nome || 'graduação';
+        const valor = taxaExameFaixa(d, a.faixaIdx + 1);
+        d.pagamentos.push({
+          id: uid('pg'), tipo: 'exame', pessoaId: a.id, filialId: a.filialId, competencia: todayISO().slice(0, 7),
+          descricao: `Taxa de exame — ${nome}`, valor, vencimento, status: 'pendente', criadoEm: agora, lembretes: [], liberadaPor: user.nome,
+        });
+        notify(d, a.id, 'Taxa de exame liberada 🎖️', `Taxa para a faixa ${nome}: ${brl(valor)}, vencimento ${fmtDate(vencimento)}. Acesse Pagamentos para pagar e confirmar sua inscrição.`);
+      }
     });
-    toast('Taxa de exame gerada.');
+    toast(alvo.length === 1 ? `Taxa liberada para ${alvo[0].nome.split(' ')[0]}.` : `${alvo.length} taxas de exame liberadas.`);
   };
+  const liberarUma = (a) =>
+    ask(`Liberar a taxa de exame de ${a.nome} (${proxima(a)?.nome}): ${brl(taxaExameFaixa(db, a.faixaIdx + 1))}, vencimento ${fmtDate(vencimento)}?`, () => liberarTaxas([a]), 'Liberar taxa');
+  // Lote por graduação (faixa atual → próxima), com o resumo de quantos e quanto antes de confirmar
+  const grupos = Object.values(
+    alunos.filter(podeLiberar).reduce((acc, a) => {
+      (acc[a.faixaIdx] ||= { idx: a.faixaIdx, alunos: [] }).alunos.push(a);
+      return acc;
+    }, {})
+  ).sort((x, y) => x.idx - y.idx);
+  const gruposLote = grupos.filter((g) => faixaLote === '' || String(g.idx) === faixaLote);
+  const doLote = gruposLote.flatMap((g) => g.alunos);
+  const totalLote = doLote.reduce((s, a) => s + taxaExameFaixa(db, a.faixaIdx + 1), 0);
+  const liberarLote = () =>
+    ask(
+      `Liberar ${doLote.length} taxa(s) de exame, vencimento ${fmtDate(vencimento)}: ` +
+        gruposLote.map((g) => `${db.config.faixas[g.idx]?.nome} → ${db.config.faixas[g.idx + 1]?.nome}: ${g.alunos.length} × ${brl(taxaExameFaixa(db, g.idx + 1))}`).join('; ') +
+        `. Total ${brl(totalLote)}.`,
+      () => liberarTaxas(doLote),
+      'Liberar taxas'
+    );
 
   const aprovarGraduacao = (a) =>
     ask(`Aprovar oficialmente ${a.nome} para ${db.config.faixas[a.faixaIdx + 1]?.nome}? O conteúdo da nova faixa será liberado.`, () =>
@@ -71,8 +105,44 @@ export default function Graduacao({ user }) {
     <>
       <PageHead title="Graduação & Pré-Exame" sub="Checklist Apto / Necessita Reforço antes de gerar a taxa de exame">
         <Search value={q} onChange={setQ} placeholder="Buscar aluno" />
+        {isAdmin && (
+          <select value={filial} onChange={(e) => (setFilial(e.target.value), setFaixaLote(''))} style={{ maxWidth: 220 }}>
+            <option value="">Todas as filiais</option>
+            {db.filiais.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+          </select>
+        )}
       </PageHead>
       <Tabs tabs={[['avaliar', '📋 Pré-avaliação'], ['exame', '🎖️ Inscritos / Aprovação'], ['propostas', `📨 Propostas (${propostas.length})`]]} value={tab} onChange={setTab} />
+
+      {tab === 'avaliar' && (
+        <Card title="💳 Liberar taxa de exame" className="mb">
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Libera a cobrança no app do aluno (Pagamentos) com o valor da tabela de cada graduação — independe da pré-avaliação. Quem já tem a taxa da próxima faixa liberada fica de fora.
+          </p>
+          <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
+            <label className="small" style={{ display: 'grid', gap: 4 }}>
+              Graduação
+              <select value={faixaLote} onChange={(e) => setFaixaLote(e.target.value)} style={{ minWidth: 260 }}>
+                <option value="">Todas as graduações ({grupos.reduce((s, g) => s + g.alunos.length, 0)} alunos)</option>
+                {grupos.map((g) => (
+                  <option key={g.idx} value={String(g.idx)}>
+                    {db.config.faixas[g.idx]?.nome} → {db.config.faixas[g.idx + 1]?.nome} · {g.alunos.length} × {brl(taxaExameFaixa(db, g.idx + 1))}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="small" style={{ display: 'grid', gap: 4 }}>
+              Vencimento
+              <input type="date" value={vencimento} min={todayISO()} onChange={(e) => setVencimento(e.target.value)} />
+            </label>
+            <button className="btn" disabled={!doLote.length || !vencimento} onClick={liberarLote}>
+              Liberar para {doLote.length} aluno{doLote.length === 1 ? '' : 's'} · {brl(totalLote)}
+            </button>
+          </div>
+          {proximoExame && <div className="xs muted mt">📅 Próximo exame: {proximoExame.titulo} — {fmtDate(proximoExame.data)}</div>}
+          {!grupos.length && alunos.length > 0 && <div className="xs muted mt">Todos os alunos da lista já estão com a taxa liberada.</div>}
+        </Card>
+      )}
 
       {tab === 'avaliar' && (
         <Card>
@@ -80,7 +150,7 @@ export default function Graduacao({ user }) {
           {alunos.map((a) => {
             const fr = frequencia(db, a);
             const fin = situacaoAluno(db, a);
-            const taxa = db.pagamentos.find((p) => p.pessoaId === a.id && p.tipo === 'exame' && p.status === 'pendente');
+            const taxa = taxaDe(a);
             const bloqueios = [!fr.ok && `frequência ${fr.pct}% (mín. ${fr.min}%)`, fin.bloqueado && 'inadimplente'].filter(Boolean);
             return (
               <div key={a.id} className="list-item" style={{ flexWrap: 'wrap' }}>
@@ -121,10 +191,10 @@ export default function Graduacao({ user }) {
                     })}
                     {a.preExame && <button type="button" className="btn sm ghost" title="Remover avaliação" aria-label="Remover avaliação" onClick={() => avaliar(a, null)}>✕</button>}
                   </div>
-                  {a.preExame?.status === 'apto' && !taxa && !a.inscritoExame && bloqueios.length === 0 && (
-                    <button className="btn sm dark" onClick={() => gerarTaxa(a)}>Gerar taxa · {brl(taxaExameFaixa(db, a.faixaIdx + 1))}</button>
+                  {podeLiberar(a) && !a.inscritoExame && (
+                    <button className="btn sm dark" title={`Taxa para ${proxima(a)?.nome}`} onClick={() => liberarUma(a)}>💳 Liberar taxa · {brl(taxaExameFaixa(db, a.faixaIdx + 1))}</button>
                   )}
-                  {taxa && <span className="badge warn">Taxa pendente</span>}
+                  {taxa && <span className={`badge ${taxa.status === 'pago' ? 'ok' : 'warn'}`}>{taxa.status === 'pago' ? 'Taxa paga' : `Taxa liberada · ${brl(taxa.valor)}`}</span>}
                   {!isAdmin && (
                     <button className="btn sm ghost" title="Propor graduação ao Administrador" onClick={() => setDB((d) => { d.alunos.find((y) => y.id === a.id).propostaGraduacao = { por: user.nome, data: todayISO() }; notify(d, 'admin', 'Proposta de graduação', `${user.nome} propôs a graduação de ${a.nome}.`); toast('Proposta enviada à Central.'); })}>📨</button>
                   )}
