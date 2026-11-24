@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useDB, setDB, replaceDB, DEPARTAMENTOS_PADRAO } from '../../lib/db';
 import { uid, brl } from '../../lib/utils';
 import { PageHead, Card, Field, Inp, toast, useConfirm, faixaFundo, useAutoSalvar, BarraSalvar } from '../../components/ui';
@@ -9,10 +9,28 @@ export default function Config() {
   const db = useDB();
   const [c, setC] = useState(db.config);
   const [ask, confirmEl] = useConfirm();
+  // Configuração como a página viu por último (abertura, último salvamento ou atualização do servidor)
+  const baseCfg = useRef(db.config);
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // Mudou no servidor (outra aba, outro ADM, correção direta): atualiza o que esta página não está editando
+  useEffect(() => {
+    const novo = db.config;
+    const velho = baseCfg.current;
+    if (novo === velho) return;
+    setC((prev) => {
+      const out = { ...prev };
+      for (const k of new Set([...Object.keys(novo), ...Object.keys(velho)])) if (igual(prev[k], velho[k])) out[k] = novo[k];
+      return out;
+    });
+    baseCfg.current = novo;
+  }, [db.config]);
+  // Grava só os campos alterados nesta página (não desfaz o que mudou em outro lugar)
   const salvar = () => {
     const limpo = { ...c };
     if (c.gradModalidades) limpo.gradModalidades = c.gradModalidades.filter((t) => t.modalidade?.trim()).map((t) => ({ ...t, modalidade: t.modalidade.trim(), niveis: t.niveis.map((n) => n.trim()).filter(Boolean) }));
-    setDB((d) => (d.config = { ...d.config, ...limpo }));
+    const mudados = Object.keys(limpo).filter((k) => !igual(limpo[k], baseCfg.current[k]));
+    if (!mudados.length) return;
+    setDB((d) => mudados.forEach((k) => (d.config[k] = limpo[k])));
   };
   // Salva sozinho 3 s depois da última alteração (ou na hora, pelo botão)
   const [estado, salvarAgora] = useAutoSalvar(c, salvar);

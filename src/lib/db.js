@@ -250,10 +250,12 @@ async function gravarDiferencas() {
     if (!igual(base[k], alvo[k])) {
       recentes.set('app_config:' + k, agora);
       const existe = base[k] !== null && base[k] !== undefined;
-      const { error } = existe
-        ? await supabase.from('app_config').update({ data: alvo[k] }).eq('id', k)
-        : await supabase.from('app_config').insert({ id: k, data: alvo[k] });
+      // .select(): sem permissão o Supabase não acusa erro no update (só não grava nada) — aqui isso vira falha visível
+      const { data: gravados, error } = existe
+        ? await supabase.from('app_config').update({ data: alvo[k] }).eq('id', k).select('id')
+        : await supabase.from('app_config').insert({ id: k, data: alvo[k] }).select('id');
       if (error) falhou = error;
+      else if (!gravados?.length) falhou = { message: `Configuração "${k}" não foi gravada (sem permissão de administrador)` };
     }
   }
   servidor = structuredClone(alvo);
